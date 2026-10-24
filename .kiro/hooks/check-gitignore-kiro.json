@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Warn if .gitignore ignores .kiro",
+      "trigger": "PostFileSave",
+      "description": "When .gitignore is saved, warn if the .kiro folder would be ignored; it must stay committed (R16.2).",
+      "matcher": "(^|[\\\\/])\\.gitignore$",
+      "action": {
+        "type": "command",
+        "command": "node .kiro/hooks/scripts/check-gitignore-kiro.mjs",
+        "timeout": 30
+      }
+    }
+  ]
+}

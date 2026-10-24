@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Run related tests on dates/vision save",
+      "trigger": "PostFileSave",
+      "description": "When a file under src/lib/dates or src/lib/vision is saved, run that module's Vitest files (R16.1).",
+      "matcher": "src[\\\\/]lib[\\\\/](dates|vision)[\\\\/]",
+      "action": {
+        "type": "command",
+        "command": "node .kiro/hooks/scripts/run-related-tests.mjs",
+        "timeout": 120
+      }
+    }
+  ]
+}
