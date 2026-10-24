@@ -8,9 +8,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 
-// API prefixes that require a valid session. /api/session is intentionally
-// excluded so the login/logout endpoint is always reachable.
-const PROTECTED_API_PREFIXES = ["/api/vision", "/api/items"];
+// API prefixes that require a valid session (manager APIs). /api/session is
+// excluded so login/logout is reachable; public student APIs (added later) are
+// also excluded by not listing them here.
+const PROTECTED_API_PREFIXES = ["/api/vision", "/api/items", "/api/inventory", "/api/campus"];
 
 // Page prefixes that require a valid session.
 const PROTECTED_PAGE_PREFIXES = ["/intake"];
@@ -48,5 +49,11 @@ export async function middleware(request: NextRequest) {
 // Only run the middleware on the routes it actually guards. The matcher keeps
 // it off static assets and unprotected pages for speed.
 export const config = {
-  matcher: ["/intake/:path*", "/api/vision/:path*", "/api/items/:path*"],
+  matcher: [
+    "/intake/:path*",
+    "/api/vision/:path*",
+    "/api/items/:path*",
+    "/api/inventory/:path*",
+    "/api/campus/:path*",
+  ],
 };

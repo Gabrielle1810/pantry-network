@@ -1,1 +1,41 @@
 @import "tailwindcss";
+
+/* Design tokens ported from design-reference/app/styles.css :root (PL.1).
+   Exposed as Tailwind v4 theme tokens so utilities like bg-app, text-ink,
+   rounded-lg (16px) are available across the app. */
+@theme {
+  --color-app: #f4f5f2;
+  --color-surface: #ffffff;
+  --color-ink: #111714;
+  --color-muted: #5e6a63;
+  --color-line: #e6e8e4;
+  --color-line-2: #daddd5;
+  --color-primary: #1a211d;
+  --color-hover: #f5f6f4;
+  --color-chip: #f1f3f0;
+  --color-chip-ink: #4a5650;
+
+  --color-green: #1e7a46;
+  --color-green-bg: #e7f5ec;
+  --color-green-soft: #f1f8f4;
+  --color-green-line: #d3eadb;
+  --color-blue: #1d4e9b;
+  --color-blue-bg: #e5eefb;
+  --color-amber: #8a5a00;
+  --color-amber-2: #b7791f;
+  --color-amber-bg: #fff3db;
+  --color-red: #b42318;
+  --color-red-bg: #fde7e4;
+  --color-red-btn: #c0392b;
+
+  --color-bar-g: #2f9d5e;
+  --color-bar-a: #e0a43a;
+  --color-bar-r: #d64535;
+
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-lg: 16px;
+
+  /* Figtree wired via next/font; exposed as the default sans stack (PL.1). */
+  --font-sans: var(--font-figtree), system-ui, -apple-system, sans-serif;
+}

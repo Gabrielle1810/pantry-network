@@ -1,14 +1,24 @@
 import type { Metadata, Viewport } from "next";
+import { Figtree } from "next/font/google";
 import "./globals.css";
 
+// Figtree is the app font (PL.1). Exposed as a CSS variable consumed by the
+// --font-sans theme token in globals.css.
+const figtree = Figtree({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-figtree",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Pantry Network — Intake",
+  title: "Pantry Network",
   description:
-    "Phone-first intake for university food pantries: photograph an item, the AI reads the label, staff confirm, and it is saved as an inventory batch.",
+    "A shared inventory for Massachusetts campus food pantries. Sample data.",
 };
 
-// Phone-first: lock to device width so pages render correctly on a 390 px
-// viewport (R1.2) without desktop zoom-out.
+// Works on a 390 px phone (student page, Add stock camera) and desktop (manager
+// pages own their own width). Root stays full-width; pages add their layout.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -16,8 +26,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en">
-      <body className="mx-auto min-h-dvh max-w-md bg-white text-gray-900">
+    <html lang="en" className={figtree.variable}>
+      <body className="min-h-dvh bg-app font-sans text-ink antialiased">
         {children}
       </body>
     </html>

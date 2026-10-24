@@ -8,6 +8,8 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // Reference prototype kept as documentation only (PA.3).
+    exclude: ["design-reference/**", "node_modules/**"],
   },
   resolve: {
     alias: {
