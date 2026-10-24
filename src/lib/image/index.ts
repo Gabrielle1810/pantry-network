@@ -57,16 +57,38 @@ export interface PreparedImage {
  */
 export async function prepareImage(file: File): Promise<PreparedImage> {
   const bitmap = await createImageBitmap(file);
-  const { width, height } = computeTargetDimensions(bitmap.width, bitmap.height);
+  const canvas = drawScaled(bitmap, bitmap.width, bitmap.height);
+  bitmap.close?.();
+  return encodeCanvas(canvas);
+}
 
+/**
+ * Browser-only: grab the current frame of a live <video> viewfinder, scaled to
+ * the same limits and re-encoded the same way as prepareImage (R4.1-R4.4).
+ */
+export async function captureVideoFrame(video: HTMLVideoElement): Promise<PreparedImage> {
+  if (!video.videoWidth || !video.videoHeight) throw new Error("Camera not ready");
+  return encodeCanvas(drawScaled(video, video.videoWidth, video.videoHeight));
+}
+
+/** Data URL for showing a prepared image in memory (never stored). */
+export function toDataUrl(image: PreparedImage): string {
+  return `data:image/jpeg;base64,${image.base64}`;
+}
+
+function drawScaled(source: CanvasImageSource, srcW: number, srcH: number): HTMLCanvasElement {
+  const { width, height } = computeTargetDimensions(srcW, srcH);
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas 2D context unavailable");
-  ctx.drawImage(bitmap, 0, 0, width, height);
-  bitmap.close?.();
+  ctx.drawImage(source, 0, 0, width, height);
+  return canvas;
+}
 
+async function encodeCanvas(canvas: HTMLCanvasElement): Promise<PreparedImage> {
+  const { width, height } = canvas;
   async function exportAt(quality: number): Promise<{ base64: string; bytes: number }> {
     const blob: Blob = await new Promise((resolve, reject) =>
       canvas.toBlob(

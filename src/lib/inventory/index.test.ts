@@ -71,6 +71,8 @@ describe("inventoryCards", () => {
     expect(cards[2].num).toBe(1);
     expect(cards[3].label).toBe("Items this period");
     expect(cards[3].num).toBe(3);
+    // PD.2: "Add items" on Running low opens Add stock prefilled with that product.
+    expect(cards[0].actions?.[0]).toEqual({ label: "Add items", href: "/add?product=Cheerios", primary: true });
   });
 });
 

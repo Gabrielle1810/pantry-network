@@ -8,8 +8,9 @@
 //    the campus has none yet, so re-seeding never rotates a live token and no
 //    token is ever hard-coded in the repo (PI.1).
 //  * products: upsert by (campus_id, product_key).
-//  * batches/ledger: carry a deterministic `idempotency_key` ("seed:...") so the
-//    partial unique indexes make re-inserts no-ops.
+//  * batches/ledger: carry a deterministic `idempotency_key` ("seed:..."); a
+//    re-insert hits the partial unique index (23505) and is skipped. Counts in
+//    the result are rows newly inserted by this run.
 //  * offers/requests: deleted-then-reinserted for the seed set so counts stay
 //    stable (they belong only to sample campuses).
 import { randomUUID, randomBytes } from "node:crypto";
@@ -25,6 +26,8 @@ import {
   isoFromOffset,
   type SeedItemSpec,
 } from "./seed";
+
+const UNIQUE_VIOLATION = "23505";
 
 export interface SeedResult {
   campuses: number;
@@ -107,41 +110,37 @@ export async function seedSupabase(url: string, serviceRoleKey: string, todayIso
       const receivedOn = isoFromOffset(todayIso, s.restockOffsetDays);
       const expiresOn = s.expiresOffsetDays === null ? null : isoFromOffset(todayIso, s.expiresOffsetDays);
 
-      // Intake batch sized to `of` (idempotent by deterministic key).
-      const { error: be } = await db.from("item_batches").upsert(
-        {
-          campus_id: campusId,
-          product_id: productId,
-          quantity: s.of,
-          received_on: receivedOn,
-          expires_on: expiresOn,
-          date_type: null,
-          date_precision: null,
-          date_source: "imported",
-          idempotency_key: `seed:${campusId}:${s.id}:b0`,
-        },
-        { onConflict: "campus_id,idempotency_key" },
-      );
-      if (be) throw new Error(`seed batch ${s.name}: ${be.message}`);
-      batchCount++;
+      // Intake batch sized to `of`. The idempotency index is PARTIAL, which
+      // ON CONFLICT can't target, so insert and treat a duplicate key (23505)
+      // as "already seeded".
+      const { error: be } = await db.from("item_batches").insert({
+        campus_id: campusId,
+        product_id: productId,
+        quantity: s.of,
+        received_on: receivedOn,
+        expires_on: expiresOn,
+        date_type: null,
+        date_precision: null,
+        date_source: "imported",
+        idempotency_key: `seed:${campusId}:${s.id}:b0`,
+      });
+      if (be && be.code !== UNIQUE_VIOLATION) throw new Error(`seed batch ${s.name}: ${be.message}`);
+      if (!be) batchCount++;
 
       // Balancing take-out so derived on-shelf == qty.
       const consumed = s.of - s.qty;
       if (consumed > 0) {
-        const { error: le } = await db.from("ledger_entries").upsert(
-          {
-            campus_id: campusId,
-            product_id: productId,
-            delta: -consumed,
-            kind: "takeout",
-            source: "system",
-            reason: "Seed baseline",
-            idempotency_key: `seed:${campusId}:${s.id}:out`,
-          },
-          { onConflict: "campus_id,idempotency_key" },
-        );
-        if (le) throw new Error(`seed ledger ${s.name}: ${le.message}`);
-        ledgerCount++;
+        const { error: le } = await db.from("ledger_entries").insert({
+          campus_id: campusId,
+          product_id: productId,
+          delta: -consumed,
+          kind: "takeout",
+          source: "system",
+          reason: "Seed baseline",
+          idempotency_key: `seed:${campusId}:${s.id}:out`,
+        });
+        if (le && le.code !== UNIQUE_VIOLATION) throw new Error(`seed ledger ${s.name}: ${le.message}`);
+        if (!le) ledgerCount++;
       }
     }
   }

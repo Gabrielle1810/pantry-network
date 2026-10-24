@@ -257,8 +257,8 @@ export default function VisionTestPage() {
                     </p>
                   ) : null}
                   <p className="mt-1">
-                    <a className="text-green-700 underline" href="/intake/today">
-                      Open /intake/today
+                    <a className="text-green-700 underline" href="/inventory">
+                      Open Inventory
                     </a>
                   </p>
                 </>

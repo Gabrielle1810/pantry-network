@@ -13,14 +13,14 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
 
 ## Step 0 — Groundwork
 
-### Task 0.1 — Exclude design-reference; add deps 🔴
+### Task 0.1 — Exclude design-reference; add deps 🔴 ✅
 - tsconfig `exclude`, ESLint ignore, vitest `exclude` for `design-reference/**` (PA.3).
 - Add `lucide-react`; wire Figtree via `next/font`. Port `:root` tokens into
   `globals.css` `@theme` (PL.1).
 - **Tests:** build/lint/test still green with design-reference ignored.
 - **Reqs:** PA.3, PL.1.
 
-### Task 0.2 — Shared pure logic: stock, status, device, labels, campus 🔴
+### Task 0.2 — Shared pure logic: stock, status, device, labels, campus 🔴 ✅
 - `src/lib/stock` (`deriveOnShelf`, `consumeFIFO`, `lastRestockAmount`),
   `src/lib/status` (`statusOf` + constants), `src/lib/device` (`detectPhone`),
   `src/lib/labels` (`COMMUNITY_LABEL`), `src/lib/campus` (sample campuses + active
@@ -33,7 +33,7 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
 
 ## Step 1 — Data layer + Supabase 🔴
 
-### Task 1.1 — Schema migration `002_app.sql` (not executed) 🔴
+### Task 1.1 — Schema migration `002_app.sql` (not executed) 🔴 ✅
 - `campuses` (incl. `student_token` unguessable, PI.1), `products`, `item_batches`,
   `ledger_entries` (kinds incl. `recount`/`community_out`/`community_in`; **no**
   person/name column, PH.2/PO.5), `offers` (with reserved semantics), `requests`,
@@ -41,7 +41,7 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
   `product_corrections`; indexes; RLS enabled; policies-later note. Give you the SQL.
 - **Reqs:** PM.1, PB.8, PD.9a, PI.1, PI.6.
 
-### Task 1.2 — Repository extension (Memory + Supabase) 🔴
+### Task 1.2 — Repository extension (Memory + Supabase) 🔴 ✅
 - Extend `ItemRepository` (§4): campuses, derived inventory (on-shelf **and**
   reserved), products, batches, ledger, feed, offers/requests/pickups, held
   submissions, corrections. MemoryRepository seeded for **two live campuses**:
@@ -58,7 +58,7 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
   Supabase selected only when both env vars set (client stubbed).
 - **Reqs:** PM.2–PM.4, PB.1/2/8, PD.9a, decision #1/#2.
 
-### Task 1.3 — API: inventory read + campus switch 🔴
+### Task 1.3 — API: inventory read + campus switch 🔴 ✅
 - `GET /api/inventory` (derived rows + smart-card models), `GET/POST /api/campus`
   (active campus in session cookie). Extend middleware for new manager APIs; keep
   student/poster public.
@@ -70,7 +70,7 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
 
 ## Step 2 — App shell + Inventory 🔴
 
-### Task 2.1 — Manager shell + campus switcher + design primitives 🔴
+### Task 2.1 — Manager shell + campus switcher + design primitives 🔴 ✅
 - `<Sidebar>` (brand, `<CampusSwitcher>`, nav: Inventory/Add stock/Take-out/
   Community; footer: Help/Settings) — **no Student page link** (PC.2). `SmartCard`,
   `StatusPill`, `StockBar`, `Chip`, `IconButton`, `Stepper`, `Modal`, `Drawer`,
@@ -78,13 +78,13 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
 - **Tests:** none (UI); in-place behavior covered by lib + a focused interaction note.
 - **Reqs:** PC.1–PC.5, PG.1, PL.2–PL.4.
 
-### Task 2.2 — Inventory smart cards + model 🔴
+### Task 2.2 — Inventory smart cards + model 🔴 ✅
 - `src/lib/inventory` smart-card models (running low / soon / expired / this period),
   tab filters, search, row view-models. `/inventory` renders them.
 - **Tests:** card models + tab counts + search filter (pure).
 - **Reqs:** PD.1–PD.6.
 
-### Task 2.3 — Inventory edit drawer + Full sheet + remove flow 🔴
+### Task 2.3 — Inventory edit drawer + Full sheet + remove flow 🔴 ⏸ not built yet; moved to Step 4 (shares the ledger/remove code with Take-out)
 - Edit drawer + Full-sheet cell edits: editing on-shelf writes an "Edited by staff"
   adjustment entry, never an overwrite (fix B, PD.7a/PD.10). Selection bar; remove
   flow (reasons, FIFO reduce, ledger, 10s Undo). "Moved to Community" creates an open
@@ -98,7 +98,7 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
 
 ## Step 3 — Add stock (phone camera + desktop typed) 🔴
 
-### Task 3.1 — Intake review state machine + ReviewDraft (from intake-ui) 🔴
+### Task 3.1 — Intake review state machine + ReviewDraft (from intake-ui) 🔴 ✅
 - Port the intake-ui `src/lib/intake` (review states, buildDraft, savable,
   computeEditedFields, applyDateOnlyRead, unit/pluralize) onto the product+batch
   model.
@@ -106,13 +106,13 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
   dont_track/doesnt_expire ⇒ null; remembered fix prefilled not counted as edit.
 - **Reqs:** PE.2, PE.3.
 
-### Task 3.2 — Phone camera flow UI 🔴
+### Task 3.2 — Phone camera flow UI 🔴 ✅
 - `/add` on phone: viewfinder (getUserMedia) + file fallback, shutter, "Reading…",
   review (all states), saved + totals, keep going. Reuse `src/lib/image` + vision.
 - **Tests:** none (UI); machine tested in 3.1.
 - **Reqs:** PE.1–PE.5.
 
-### Task 3.3 — Desktop typed form + capability routing 🔴
+### Task 3.3 — Desktop typed form + capability routing 🔴 ✅ (saves now create product + item_batch; `items` table no longer written)
 - `detectPhone` picks camera vs typed form; desktop Add stock is typed-only (no
   camera, no upload, no image), saving via the same pipeline; prefill from
   Running-low (PD.2/PF.3); "Type it instead" on phone opens the typed form.

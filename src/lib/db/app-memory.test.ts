@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { MemoryAppRepository } from "./app-memory";
 import { getAppRepository } from "./index";
 import { HARBOR_ITEMS, CEDAR_ITEMS } from "./seed";
+import type { IntakeInput } from "./app-types";
 
 const TODAY = "2026-10-24";
 
@@ -54,6 +55,77 @@ describe("PO.4 student inventory hides expired and out", () => {
     // cheerios (out) and sauce (expired) must not appear
     expect(rows.find((r) => r.productId === "harbor:cheerios")).toBeUndefined();
     expect(rows.find((r) => r.productId === "harbor:sauce")).toBeUndefined();
+  });
+});
+
+describe("saveIntake (Step 3: every save creates or reuses a product + adds a batch)", () => {
+  const input = (overrides: Partial<IntakeInput> = {}): IntakeInput => ({
+    campusId: "harbor",
+    idempotencyKey: null,
+    receivedOn: TODAY,
+    product: {
+      name: "Lentils",
+      brand: "Goya",
+      sizeText: null,
+      category: "Dried Pasta/Grains",
+      categoryGroup: null,
+      unit: "bag",
+      noExpire: false,
+      source: "donated",
+    },
+    quantity: 5,
+    expiresOn: null,
+    dateType: null,
+    datePrecision: null,
+    dateSource: null,
+    editedFields: [],
+    read: null,
+    ...overrides,
+  });
+
+  it("a new product shows up in Inventory right away", async () => {
+    const repo = new MemoryAppRepository(TODAY);
+    const r = await repo.saveIntake(input());
+    expect(r.totals).toEqual({ before: 0, added: 5, after: 5, firstBatch: true });
+    const row = (await repo.listInventory("harbor", TODAY)).find((x) => x.name === "Lentils");
+    expect(row?.onShelf).toBe(5);
+    expect(row?.lastRestock).toBe(5);
+  });
+
+  it("reuses an existing product by product_key (case and spaces ignored); before + added = after", async () => {
+    const repo = new MemoryAppRepository(TODAY);
+    const r = await repo.saveIntake(
+      input({ product: { ...input().product, name: "tomato  PASTE", brand: "HUNT'S", category: "Sauces/Pastes/Spread", unit: "can" }, quantity: 4 }),
+    );
+    expect(r.product.id).toBe("harbor:tomato");
+    expect(r.totals).toEqual({ before: 2, added: 4, after: 6, firstBatch: false });
+    const tomato = await repo.getProduct("harbor", "harbor:tomato", TODAY);
+    expect(tomato?.onShelf).toBe(6);
+    expect(tomato?.lastRestock).toBe(4); // last restock = newest batch
+  });
+
+  it("is idempotent: a repeated key adds nothing", async () => {
+    const repo = new MemoryAppRepository(TODAY);
+    const first = await repo.saveIntake(input({ idempotencyKey: "same" }));
+    const second = await repo.saveIntake(input({ idempotencyKey: "same", quantity: 99 }));
+    expect(second.duplicate).toBe(true);
+    expect(second.batch.id).toBe(first.batch.id);
+    const row = (await repo.listInventory("harbor", TODAY)).find((x) => x.name === "Lentils");
+    expect(row?.onShelf).toBe(5);
+  });
+
+  it("saves are scoped to the campus", async () => {
+    const repo = new MemoryAppRepository(TODAY);
+    await repo.saveIntake(input({ campusId: "cedar" }));
+    expect((await repo.listInventory("harbor", TODAY)).some((x) => x.name === "Lentils")).toBe(false);
+    expect((await repo.listInventory("cedar", TODAY)).some((x) => x.name === "Lentils")).toBe(true);
+  });
+
+  it("round-trips a remembered fix per campus", async () => {
+    const repo = new MemoryAppRepository(TODAY);
+    await repo.saveCorrection("harbor", "tomato pase|hunts", { name: "Tomato paste", brand: "Hunt's", category: "Sauces/Pastes/Spread" });
+    expect((await repo.getCorrection("harbor", "tomato pase|hunts"))?.name).toBe("Tomato paste");
+    expect(await repo.getCorrection("cedar", "tomato pase|hunts")).toBeNull();
   });
 });
 

@@ -9,9 +9,9 @@
 //   - gemini-3.5-flash-lite is multimodal, accepts image input, and is much
 //     faster than 3.8-flash for this extraction (chosen as the default).
 import { GoogleGenAI } from "@google/genai";
-import { SYSTEM_PROMPT } from "./prompt";
+import { SYSTEM_PROMPT, userTextFor } from "./prompt";
 import { LABEL_READ_JSON_SCHEMA, labelReadSchema, type LabelRead } from "./schema";
-import { UnreadableError, type VisionProvider } from "./provider";
+import { UnreadableError, type ReadOptions, type VisionProvider } from "./provider";
 
 const DEFAULT_MODEL = "gemini-3.5-flash-lite";
 
@@ -25,7 +25,8 @@ export class GeminiVisionProvider implements VisionProvider {
     this.model = model;
   }
 
-  async readLabel(imageJpegBase64: string): Promise<LabelRead> {
+  async readLabel(imageJpegBase64: string, options: ReadOptions = {}): Promise<LabelRead> {
+    const mode = options.mode ?? "read";
     const startedAt = Date.now();
     const response = await this.client.models.generateContent({
       model: this.model,
@@ -33,7 +34,7 @@ export class GeminiVisionProvider implements VisionProvider {
         {
           inlineData: { mimeType: "image/jpeg", data: imageJpegBase64 },
         },
-        { text: "Read this one item. Return only the JSON object." },
+        { text: userTextFor(mode) },
       ],
       config: {
         systemInstruction: SYSTEM_PROMPT,
@@ -47,7 +48,7 @@ export class GeminiVisionProvider implements VisionProvider {
     const elapsedMs = Date.now() - startedAt;
     const usage = response.usageMetadata;
     console.info(
-      `[vision] gemini model=${this.model} elapsed_ms=${elapsedMs} input_tokens=${usage?.promptTokenCount ?? "?"} output_tokens=${usage?.candidatesTokenCount ?? "?"}`,
+      `[vision] gemini model=${this.model} mode=${mode} elapsed_ms=${elapsedMs} input_tokens=${usage?.promptTokenCount ?? "?"} output_tokens=${usage?.candidatesTokenCount ?? "?"}`,
     );
 
     // A blocked/refused/truncated response has no usable text → unreadable

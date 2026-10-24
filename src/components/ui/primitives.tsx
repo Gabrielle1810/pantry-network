@@ -61,6 +61,47 @@ export function StockBar({ onShelf, lastRestock }: { onShelf: number; lastRestoc
   );
 }
 
+/** − value + stepper. The value updates in place; buttons have accessible names. */
+export function Stepper({
+  value,
+  onChange,
+  min = 1,
+  max = 999,
+  label,
+}: {
+  value: number;
+  onChange: (next: number) => void;
+  min?: number;
+  max?: number;
+  label: string;
+}) {
+  const btn =
+    "grid h-11 w-11 place-items-center rounded-xl bg-chip text-lg font-semibold hover:bg-line disabled:opacity-40";
+  return (
+    <div className="flex items-center gap-2" role="group" aria-label={label}>
+      <button type="button" className={btn} aria-label={`Decrease ${label.toLowerCase()}`} disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))}>
+        −
+      </button>
+      <input
+        type="number"
+        inputMode="numeric"
+        min={min}
+        max={max}
+        value={value}
+        aria-label={label}
+        onChange={(e) => {
+          const n = Number(e.target.value);
+          if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, Math.round(n))));
+        }}
+        className="h-11 w-14 rounded-lg bg-transparent text-center text-lg font-bold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+      />
+      <button type="button" className={btn} aria-label={`Increase ${label.toLowerCase()}`} disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))}>
+        +
+      </button>
+    </div>
+  );
+}
+
 export function Chip({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "green" | "blue" | "amber" | "red" }) {
   const styles = {
     neutral: "bg-chip text-chip-ink",

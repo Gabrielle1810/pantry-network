@@ -2,7 +2,7 @@
 // fallback so the app runs end to end without any API key (R6.4). Never calls
 // the network. Fixtures cover the cases the pipeline must handle.
 import type { LabelRead } from "./schema";
-import { UnreadableError, type VisionProvider } from "./provider";
+import { UnreadableError, type ReadOptions, type VisionProvider } from "./provider";
 
 function fixture(overrides: Partial<LabelRead>): LabelRead {
   return {
@@ -81,16 +81,31 @@ export const MOCK_FIXTURES: Record<string, LabelRead> = {
 
 const ORDER = Object.keys(MOCK_FIXTURES);
 
+// Module-level so the demo cycles through scenarios across requests (the
+// provider is rebuilt per request).
+let callCount = 0;
+
+/** What a date-only close-up returns in demo mode. */
+const DATE_ONLY_FIXTURE = fixture({
+  name_confidence: 0,
+  container: "item",
+  date_raw: "BEST BY 06/2027",
+  date_type: "best_by",
+  expires_on: "2027-06-30",
+  date_precision: "month",
+  date_confidence: 0.8,
+});
+
 export class MockVisionProvider implements VisionProvider {
   readonly name = "mock" as const;
-  private calls = 0;
 
   constructor(private readonly fixedKey?: keyof typeof MOCK_FIXTURES) {}
 
-  async readLabel(_imageJpegBase64: string): Promise<LabelRead> {
+  async readLabel(_imageJpegBase64: string, options: ReadOptions = {}): Promise<LabelRead> {
     void _imageJpegBase64;
-    const key = this.fixedKey ?? ORDER[this.calls % ORDER.length];
-    this.calls += 1;
+    if (options.mode === "date_only") return { ...DATE_ONLY_FIXTURE, date_candidates: [] };
+    const key = this.fixedKey ?? ORDER[callCount % ORDER.length];
+    callCount += 1;
     const read = MOCK_FIXTURES[key as string];
     if (!read) throw new UnreadableError("mock: unknown fixture");
     // Return a copy so callers can't mutate the shared fixture.

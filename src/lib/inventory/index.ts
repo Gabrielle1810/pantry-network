@@ -41,6 +41,12 @@ export function filterRows(rows: InventoryRow[], tab: InventoryTabKey, search: s
 // ---- smart cards ----
 export type CardTone = "red" | "blue" | "gray" | "green" | "amber";
 
+export interface SmartCardAction {
+  label: string;
+  href: string;
+  primary?: boolean;
+}
+
 export interface SmartCardModel {
   tone: CardTone;
   icon: string; // lucide icon name
@@ -48,6 +54,12 @@ export interface SmartCardModel {
   num?: number;
   title: string;
   sub: string;
+  actions?: SmartCardAction[];
+}
+
+/** Add stock, prefilled with a product when restocking it (PD.2/PF.3). */
+export function addStockHref(productId?: string): string {
+  return productId ? `/add?product=${encodeURIComponent(productId)}` : "/add";
 }
 
 function inDays(iso: string, todayIso: string): string {
@@ -88,6 +100,9 @@ export function inventoryCards(rows: InventoryRow[], todayIso: string): SmartCar
             low.length > 1 ? ` · ${low.slice(1, 3).map((r) => r.name).join(" and ")} ${low.length > 2 ? "are" : "is"} next` : ""
           }`
         : "Every item has at least a quarter of its last restock",
+      actions: lowFirst
+        ? [{ label: "Add items", href: addStockHref(lowFirst.productId), primary: true }]
+        : [{ label: "Add stock", href: addStockHref(), primary: true }],
     },
     {
       tone: "blue",
@@ -116,6 +131,7 @@ export function inventoryCards(rows: InventoryRow[], todayIso: string): SmartCar
       num: rows.length,
       title: `${rows.length} products tracked`,
       sub: `${donated} donated · ${rows.length - donated} purchased`,
+      actions: [{ label: "Add stock", href: addStockHref(), primary: true }],
     },
   ];
 }

@@ -38,4 +38,25 @@
 
   /* Figtree wired via next/font; exposed as the default sans stack (PL.1). */
   --font-sans: var(--font-figtree), system-ui, -apple-system, sans-serif;
+
+  /* Open animations only (PG.1): sheets/modals animate when they mount; value
+     changes inside them never re-mount, so they never replay. Used through
+     motion-safe: so reduced-motion users get no movement. */
+  --animate-sheet-in: sheet-in 220ms ease-out;
+  --animate-fade-in: fade-in 160ms ease-out;
+
+  @keyframes sheet-in {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+}
+
+/* Visible keyboard focus everywhere (PG.3), matching the prototype. */
+:focus-visible {
+  outline: 2px solid var(--color-green);
+  outline-offset: 2px;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import {
+  activeSoonestExpiry,
   deriveOnShelf,
   consumeFIFO,
   lastRestockAmount,
@@ -82,6 +83,21 @@ describe("PO.2 consumeFIFO (oldest batch first)", () => {
         },
       ),
     );
+  });
+});
+
+describe("activeSoonestExpiry", () => {
+  const old = { ...batch("old", 2, "2026-09-01"), expiresOn: "2026-09-10" };
+  const fresh = { ...batch("new", 5, "2026-10-20"), expiresOn: "2027-01-01" };
+
+  it("ignores batches that are fully used up", () => {
+    expect(activeSoonestExpiry([old, fresh], [ledger("l", -2)])).toBe("2027-01-01");
+  });
+  it("keeps a batch that still has units", () => {
+    expect(activeSoonestExpiry([old, fresh], [ledger("l", -1)])).toBe("2026-09-10");
+  });
+  it("is null once nothing dated is left", () => {
+    expect(activeSoonestExpiry([old], [ledger("l", -2)])).toBeNull();
   });
 });
 

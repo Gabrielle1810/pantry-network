@@ -3,6 +3,23 @@
 // and "item"/"items" is the final fallback.
 import type { Container } from "@/lib/vision/schema";
 
+/** Units offered in the typed form and edit sheet (containers + prototype units). */
+export const UNIT_OPTIONS = [
+  "can",
+  "box",
+  "bag",
+  "bottle",
+  "jar",
+  "pack",
+  "carton",
+  "cup",
+  "bar",
+  "pouch",
+  "packet",
+  "tube",
+  "item",
+] as const;
+
 /** Per-category default container when the read didn't give one. */
 const CATEGORY_CONTAINER: Record<string, Container> = {
   "Canned Goods": "can",

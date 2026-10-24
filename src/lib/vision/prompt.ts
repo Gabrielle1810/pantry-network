@@ -2,6 +2,22 @@
 // list in rule 3 is generated from taxonomy.ts so the prompt and the taxonomy
 // can never drift. Everything else is copied exactly from the brief.
 import { CATEGORY_LIST_FOR_PROMPT } from "@/lib/items/taxonomy";
+import type { ReadMode } from "./provider";
+
+/** User-turn text for a normal label read. */
+export const READ_USER_TEXT = "Read this one item. Return only the JSON object.";
+
+/**
+ * User-turn text for "Photograph the date instead": the photo is a close-up of
+ * the date on an item staff already named. Same schema; the app keeps only the
+ * date fields from this read.
+ */
+export const DATE_ONLY_USER_TEXT =
+  'This photo is a close-up of the freshness date on an item whose name staff already know. Read only the date, following rules 4 and 5. Set name, brand, size_text and notes to null, category to "Uncategorized", container to "item", quantity_visible to null and name_confidence to 0. Return only the JSON object.';
+
+export function userTextFor(mode: ReadMode = "read"): string {
+  return mode === "date_only" ? DATE_ONLY_USER_TEXT : READ_USER_TEXT;
+}
 
 export const SYSTEM_PROMPT = `You read product labels for a university food pantry's inventory. You receive one photo of one item from a delivery. Return only the JSON object defined by the schema.
 

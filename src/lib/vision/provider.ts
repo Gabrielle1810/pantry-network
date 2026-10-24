@@ -5,10 +5,17 @@ import type { LabelRead } from "./schema";
 
 export type ProviderName = "gemini" | "anthropic" | "mock";
 
+/** "read" = the whole label; "date_only" = a close-up of just the date. */
+export type ReadMode = "read" | "date_only";
+
+export interface ReadOptions {
+  mode?: ReadMode;
+}
+
 export interface VisionProvider {
   readonly name: ProviderName;
   /** Read one item's label from a base64 JPEG (no data: prefix). */
-  readLabel(imageJpegBase64: string): Promise<LabelRead>;
+  readLabel(imageJpegBase64: string, options?: ReadOptions): Promise<LabelRead>;
 }
 
 /**

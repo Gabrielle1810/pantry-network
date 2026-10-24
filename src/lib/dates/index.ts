@@ -130,6 +130,14 @@ export function daysUntil(iso: string, todayIso: string): number {
   return Math.round((b - a) / 86_400_000);
 }
 
+/** US short date for display, e.g. "2026-10-26" → "10/26/2026". */
+export function formatUs(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return iso;
+  return `${Number(m[2])}/${Number(m[3])}/${m[1]}`;
+}
+
 /** Spell out an ISO date as a human label, e.g. "2027-06-12" → "12 June 2027". */
 export function spellOut(iso: string): string {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);

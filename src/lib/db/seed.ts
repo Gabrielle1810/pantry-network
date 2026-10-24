@@ -21,6 +21,8 @@ export interface SeedProduct {
   brand: string | null;
   unit: string;
   category: string;
+  categoryGroup?: string | null;
+  sizeText?: string | null;
   noExpire: boolean;
   source: "donated" | "purchased";
 }

@@ -10,9 +10,9 @@
 // VISION_PROVIDER=anthropic, so importing the SDK is deferred to that path.
 // When you switch back to Anthropic: `npm install @anthropic-ai/sdk` and
 // re-read the current docs before relying on these parameter names.
-import { SYSTEM_PROMPT } from "./prompt";
+import { SYSTEM_PROMPT, userTextFor } from "./prompt";
 import { LABEL_READ_JSON_SCHEMA, labelReadSchema, type LabelRead } from "./schema";
-import { UnreadableError, type VisionProvider } from "./provider";
+import { UnreadableError, type ReadOptions, type VisionProvider } from "./provider";
 
 const DEFAULT_MODEL = "claude-haiku-5-5";
 
@@ -35,7 +35,7 @@ export class AnthropicVisionProvider implements VisionProvider {
     this.model = model;
   }
 
-  async readLabel(imageJpegBase64: string): Promise<LabelRead> {
+  async readLabel(imageJpegBase64: string, options: ReadOptions = {}): Promise<LabelRead> {
     // Lazy, bundler-opaque import so @anthropic-ai/sdk is only required at
     // runtime when this provider actually runs. The indirection via Function
     // keeps the bundler (Turbopack) from statically resolving the specifier,
@@ -59,7 +59,7 @@ export class AnthropicVisionProvider implements VisionProvider {
               type: "image",
               source: { type: "base64", media_type: "image/jpeg", data: imageJpegBase64 },
             },
-            { type: "text", text: "Read this one item. Return only the JSON object." },
+            { type: "text", text: userTextFor(options.mode ?? "read") },
           ],
         },
       ],

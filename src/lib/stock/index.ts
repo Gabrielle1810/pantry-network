@@ -70,6 +70,35 @@ export function sortFIFO(batches: Batch[]): Batch[] {
   });
 }
 
+/**
+ * Units left in each batch after applying the product's net ledger change
+ * oldest-first (PB.2). A net outflow consumes the oldest batches; a net inflow
+ * (e.g. a recount up) is credited to the newest batch.
+ */
+export function remainingByBatch(batches: Batch[], ledger: Ledger[]): Map<string, number> {
+  const remaining = new Map<string, number>(batches.map((b) => [b.id, b.quantity]));
+  const net = ledger.reduce((sum, l) => sum + l.delta, 0);
+  if (net < 0) {
+    for (const c of consumeFIFO(batches, -net)) {
+      remaining.set(c.batchId, (remaining.get(c.batchId) ?? 0) - c.consumed);
+    }
+  } else if (net > 0 && batches.length > 0) {
+    const newest = sortFIFO(batches)[batches.length - 1];
+    remaining.set(newest.id, (remaining.get(newest.id) ?? 0) + net);
+  }
+  return remaining;
+}
+
+/**
+ * The soonest expiry among batches that still have units on the shelf. A batch
+ * that has been fully used up no longer drives the product's status, so an old
+ * expired batch stops showing "Expired" once it is gone.
+ */
+export function activeSoonestExpiry(batches: Batch[], ledger: Ledger[]): string | null {
+  const remaining = remainingByBatch(batches, ledger);
+  return soonestExpiry(batches.filter((b) => (remaining.get(b.id) ?? 0) > 0));
+}
+
 export interface BatchConsumption {
   batchId: string;
   consumed: number;
