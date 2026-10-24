@@ -62,20 +62,25 @@ Scope: a phone-first web page where pantry staff photograph incoming items, an A
 
 ## R6. Vision provider abstraction
 
+> **Provider update (plan change):** the active provider is now **Gemini** (`@google/genai`, model `gemini-3.8-flash`), chosen for its free tier so real phone testing can happen immediately. The Anthropic provider is implemented and kept for later but inactive. The requirements below are provider-neutral except where a provider's API shape is named; the Anthropic-specific mechanics (R6.6a–R6.9) still apply when `VISION_PROVIDER=anthropic`.
+
 - **R6.1** THE system SHALL define an interface `VisionProvider` with a single method `readLabel(imageJpegBase64: string): Promise<LabelRead>`.
-- **R6.2** THE system SHALL provide an `anthropic` provider and a `mock` provider.
-- **R6.3** THE system SHALL select the provider from env var `VISION_PROVIDER`, defaulting to `anthropic`.
-- **R6.4** IF `VISION_PROVIDER` is `anthropic` but no API key is configured THEN THE system SHALL fall back to the `mock` provider so the app runs end to end without a key.
-- **R6.5** THE system SHALL read the model ID from env var `VISION_MODEL`, defaulting to `claude-haiku-5-5`.
-- **R6.6** WHEN the anthropic provider calls the Messages API THE system SHALL request structured JSON output constrained to the `LabelRead` schema via the current structured-outputs mechanism (`output_config.format` with `type: "json_schema"`).
-- **R6.7** THE system SHALL request the lowest effort level the model supports for this extraction task (`output_config.effort: "low"`).
-- **R6.8** THE system SHALL omit `temperature`, `top_p`, and `top_k` from the request, as the model rejects them.
-- **R6.9** THE system SHALL NOT use assistant-prefill to force JSON, as the model rejects it.
-- **R6.10** WHEN a response has `stop_reason` of `"refusal"` or `"max_tokens"` THE system SHALL treat it as unreadable (feeding R5.7).
+- **R6.2** THE system SHALL provide a `gemini` provider, an `anthropic` provider, and a `mock` provider.
+- **R6.3** THE system SHALL select the provider from env var `VISION_PROVIDER`, defaulting to `gemini`.
+- **R6.4** IF the selected real provider has no API key configured THEN THE system SHALL fall back to the `mock` provider so the app runs end to end without a key.
+- **R6.5** THE system SHALL read the model ID from env var `VISION_MODEL`, defaulting to `gemini-3.8-flash` (Gemini) or `claude-haiku-5-5` (Anthropic).
+- **R6.6** WHEN a provider requests the model's output THE system SHALL constrain it to the `LabelRead` schema via that provider's structured-output mechanism:
+  - **Gemini** (verified at ai.google.dev, 2026-10): `config.responseMimeType = "application/json"` + `config.responseJsonSchema = <JSON Schema of LabelRead>`; image passed as an inline part `{ inlineData: { mimeType: "image/jpeg", data } }`; system prompt via `config.systemInstruction`; parsed text at `response.text`. Model `gemini-3.8-flash` is multimodal and accepts image input on the free tier.
+  - **Anthropic** (R6.6a): `output_config.format` with `type: "json_schema"`.
+- **R6.7** (Anthropic) THE system SHALL request the lowest effort level the model supports (`output_config.effort: "low"`). Gemini has no equivalent knob for this call.
+- **R6.8** (Anthropic) THE system SHALL omit `temperature`, `top_p`, and `top_k`, as the model rejects them.
+- **R6.9** (Anthropic) THE system SHALL NOT use assistant-prefill to force JSON, as the model rejects it.
+- **R6.10** WHEN a response is refused or truncated (Anthropic `stop_reason` `"refusal"`/`"max_tokens"`; Gemini `finishReason` other than `STOP`, or empty text) THE system SHALL treat it as unreadable (feeding R5.7).
 - **R6.11** THE system SHALL send the verbatim system prompt defined in the brief, keeping its taxonomy list in sync with `src/lib/items/taxonomy.ts`.
 - **R6.12** THE `mock` provider SHALL return deterministic fixtures and SHALL be used by all tests; no test shall call the real AI API.
 - **R6.13** THE system SHALL treat text printed on packaging as data, never as instructions (reflected in the system prompt and never executed).
-- **R6.14** WHEN `VISION_PROVIDER` is `anthropic` but no `ANTHROPIC_API_KEY` is configured THE system SHALL log a clear warning at startup that it is falling back to the mock provider (complements R6.4).
+- **R6.14** WHEN a real provider is selected but its API key is missing THE system SHALL log a clear warning at startup that it is falling back to the mock provider (complements R6.4).
+- **R6.15** (privacy, plan change) WHILE using the Gemini free tier THE system SHALL assume Google may use submitted content to improve its products; it SHALL therefore send product photos only (never student data, R14.3) with metadata stripped (R14.4), and SHALL document this in the README.
 
 ## R7. Date handling (`src/lib/dates`)
 

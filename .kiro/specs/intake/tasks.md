@@ -2,6 +2,9 @@
 
 Each task is small, lists the requirement IDs it satisfies, and includes its own tests (no separate test task). Ordered for an early working end-to-end slice and a live deployment, per review round 2.
 
+> **Plan change (review round 3): Gemini first, recognition slice before the bare deploy.**
+> To get real image recognition onto a phone as fast as possible, the active vision provider is now **Google Gemini** (`@google/genai`, `gemini-3.8-flash`, free tier). The **Anthropic** provider is still implemented and kept for later but inactive (switch = env change + `npm install @anthropic-ai/sdk`). The standalone bare deploy (old Task 4) is **deferred**; instead a **recognition-only slice (Task 3.5)** ships next and is deployed via the existing auto-deploy on push to `main`. All vision requirements stay the same except provider specifics: see R6 (updated) and design §5a. Tests still use the mock only (R15).
+
 **Legend**
 - 🔴 **Required for demo** — the acceptance criteria (R18) depend on it.
 - 🟡 **Cuttable** — valuable, but the demo still works without it if time runs out.
@@ -35,7 +38,7 @@ Tests use Vitest + fast-check, mock provider only; no test hits the network or t
 
 ## Phase 2 — Auth + first deploy
 
-### Task 3 — PIN gate + session (`src/lib/auth`, `/api/session`, `/pin`, middleware) 🔴
+### Task 3 — PIN gate + session (`src/lib/auth`, `/api/session`, `/pin`, middleware) 🔴 ✅ done
 - `src/lib/auth`: `checkPin` (constant-time), `signSession`/`verifySession` (HMAC with `SESSION_SECRET`, 12h exp), cookie constants.
 - `POST /api/session` (set cookie on valid PIN, 401 otherwise), `DELETE /api/session` (logout).
 - Middleware/guard: protect intake pages (redirect to `/pin`) and protected APIs (401).
@@ -43,11 +46,19 @@ Tests use Vitest + fast-check, mock provider only; no test hits the network or t
 - **Tests (unit):** right PIN → token verifies; wrong PIN → 401, no cookie; tampered/expired token rejected; constant-time path exercised. (R15.10 PIN-gate unit.)
 - **Requirements:** R2.1–R2.8, R14.1.
 
-### Task 4 — First Vercel deploy of the bare app 🔴 🔐
-- Ensure the app builds for Vercel (Next.js preset, no server-only import leaks to client).
-- Provide the **exact** deploy steps for you to run the login parts: import the GitHub repo, framework preset Next.js, add env vars (`STAFF_PIN`, `SESSION_SECRET`, `VISION_PROVIDER=mock` for now, `VISION_MODEL`, `CAMPUS_ID`, `CAMPUS_TZ`), deploy, open the HTTPS URL on a phone, confirm `/pin` works.
-- At this point the live app gates on the PIN; capture/review come next.
-- **Tests:** none new (deploy step).
+### Task 3.5 — Recognition-only slice on Gemini (`src/lib/vision`, `src/lib/image`, `/api/vision/read-label`, `/intake/test`) 🔴 ✅ done
+- Added before the bare deploy (plan change) so the phone demo shows real reads immediately. Deployed via auto-deploy on push to `main`.
+- Read the current Gemini docs (ai.google.dev) before coding: `@google/genai` SDK, image input, structured output with a JSON schema; verified `gemini-3.8-flash` takes image input on the free tier.
+- `LabelRead` zod schema + JSON Schema export (zod 4 `z.toJSONSchema`); verbatim `SYSTEM_PROMPT` (taxonomy from `taxonomy.ts`); `GeminiVisionProvider`, `MockVisionProvider`, `AnthropicVisionProvider` (kept, inactive); `getVisionProvider` (default gemini, mock fallback + warning).
+- `applyServerRechecks`: category normalize + server-side ambiguous-date override (R5.13).
+- `POST /api/vision/read-label` behind the PIN: JPEG + ≤2 MB validation, 15s timeout, one network retry, fail-soft to `unreadable`, token logging.
+- Browser image prep (`computeTargetDimensions`, `isWithinUploadLimit`, `prepareImage` canvas wrapper).
+- Temporary `/intake/test` page: photo → fields + raw JSON.
+- **Tests:** quick ones only — LabelRead schema validation (mock fixtures valid; bad shapes rejected), ambiguous-date re-check (P2 override path), category normalization, pure image dimension/size checks. Full property tests (P4/P5/P7/etc.) come with Tasks 5–9. Mock only; no network.
+- **Requirements:** R4.1–R4.6, R5.1–R5.9, R5.12, R5.13, R6.1–R6.6, R6.10–R6.15, R10.1–R10.3.
+
+### Task 4 — First Vercel deploy of the bare app 🔴 🔐 ⏸ deferred (superseded by Task 3.5 + auto-deploy)
+- Deferred by the plan change: the app is already live on Vercel (auto-deploy on push to `main`) with the PIN gate and the recognition slice. Keep this entry for the deploy-docs checklist, folded into Task 17's `DEPLOY.md`.
 - **Requirements:** R1.1, R17.4 (partial), R17.6.
 
 ---

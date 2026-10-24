@@ -61,10 +61,12 @@ This design implements the numbered requirements in `requirements.md`. It fixes 
 - `todayInTz(tz: string): string` and `isoBefore(a, b): boolean` — compute "today"/`received_on` and expiry comparison in `CAMPUS_TZ` via `Intl.DateTimeFormat` (R7.7). No UTC.
 
 ### 2.4 `src/lib/vision`
-- `LabelRead` zod schema (R10.1) — see §6.1. Also a JSON Schema export for `output_config.format`.
-- `interface VisionProvider { readonly name: "anthropic" | "mock"; readLabel(imageJpegBase64: string): Promise<LabelRead>; }` (R6.1).
-- `AnthropicVisionProvider` (§5), `MockVisionProvider` (returns fixtures keyed deterministically; default when no key, used by all tests — R6.12).
-- `getVisionProvider(): VisionProvider` — reads `VISION_PROVIDER`; if `anthropic` without `ANTHROPIC_API_KEY`, logs a startup warning (R6.14) and returns the mock (R6.4).
+> **Plan change:** Gemini is the active provider (free tier, fastest path to real phone testing). Anthropic is implemented and kept for later but inactive.
+- `LabelRead` zod schema (R10.1) — see §6.1. Also a JSON Schema export (zod 4 native `z.toJSONSchema`) for the provider's structured-output config.
+- `interface VisionProvider { readonly name: "gemini" | "anthropic" | "mock"; readLabel(imageJpegBase64: string): Promise<LabelRead>; }` (R6.1).
+- `GeminiVisionProvider` (§5), `AnthropicVisionProvider` (§5, kept for later), `MockVisionProvider` (returns fixtures keyed deterministically; default when no key, used by all tests — R6.12).
+- `getVisionProvider(): VisionProvider` — reads `VISION_PROVIDER` (default `gemini`); if the selected real provider's key is missing, logs a startup warning (R6.14) and returns the mock (R6.4).
+- `applyServerRechecks(read)` — normalizes category and re-runs date ambiguity on `date_raw`, overriding any AI-resolved ambiguous date (R5.13).
 - `SYSTEM_PROMPT` — the verbatim brief prompt; its taxonomy list is generated from `taxonomy.ts` so the two can't drift (R6.11).
 
 ### 2.5 `src/lib/intake` (headless state machine)
@@ -169,7 +171,40 @@ Demo mode (not an error): `provider === "mock"` ⇒ UI banner "Demo mode: sample
 
 ---
 
-## 5. Anthropic vision call (grounded in current docs)
+## 5. Vision call
+
+> **Active provider: Gemini.** Anthropic (below) is kept for later.
+
+### 5a. Gemini vision call (active — grounded in current docs, ai.google.dev 2026-10)
+
+Request with `@google/genai`:
+
+```ts
+import { GoogleGenAI } from "@google/genai";
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const response = await ai.models.generateContent({
+  model: process.env.VISION_MODEL ?? "gemini-3.8-flash",
+  contents: [
+    { inlineData: { mimeType: "image/jpeg", data: imageJpegBase64 } },
+    { text: "Read this one item. Return only the JSON object." },
+  ],
+  config: {
+    systemInstruction: SYSTEM_PROMPT,                 // R6.11
+    responseMimeType: "application/json",             // structured output (R6.6)
+    responseJsonSchema: LABEL_READ_JSON_SCHEMA,       // zod 4 z.toJSONSchema
+  },
+});
+```
+
+Response handling:
+- `finishReason` other than `"STOP"`, or empty `response.text` → unreadable (R6.10).
+- Else `JSON.parse(response.text)` then `labelReadSchema.parse(...)`. Any failure → unreadable (R5.7).
+- Log `usageMetadata.promptTokenCount` / `candidatesTokenCount` (R5.11).
+- 15s timeout via `Promise.race` with a timeout; one retry only on a network error (R5.5, R5.10).
+
+Key facts confirmed from the docs (not memory): the SDK is `@google/genai`; `gemini-3.8-flash` is a current, multimodal model that accepts inline image input on the free tier; structured output is `responseMimeType` + `responseJsonSchema` (standard JSON Schema). Free-tier privacy caveat → R6.15.
+
+### 5b. Anthropic vision call (kept for later — grounded in current docs)
 
 Request to `messages.create` with `@anthropic-ai/sdk`:
 
@@ -395,9 +430,10 @@ Request:
 | `SESSION_SECRET` | — | server | HMAC key for the session token |
 | `CAMPUS_ID` | `campus-a` | server | stamps batches |
 | `CAMPUS_TZ` | `America/New_York` | server | "today" + received_on |
-| `VISION_PROVIDER` | `anthropic` | server | `anthropic` \| `mock` |
-| `VISION_MODEL` | `claude-haiku-5-5` | server | model ID |
-| `ANTHROPIC_API_KEY` | — | server | absent ⇒ mock + startup warning |
+| `VISION_PROVIDER` | `gemini` | server | `gemini` \| `anthropic` \| `mock` |
+| `VISION_MODEL` | `gemini-3.8-flash` | server | model ID for the selected provider |
+| `GEMINI_API_KEY` | — | server | active provider; absent ⇒ mock + startup warning |
+| `ANTHROPIC_API_KEY` | — | server | kept for later; used only if `VISION_PROVIDER=anthropic` |
 | `SUPABASE_URL` | — | server | both set ⇒ Supabase repo (deployed demo) |
 | `SUPABASE_SERVICE_ROLE_KEY` | — | server | server only, never `NEXT_PUBLIC_` |
 
