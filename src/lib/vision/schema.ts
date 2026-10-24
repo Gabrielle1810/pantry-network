@@ -12,6 +12,19 @@ export const DATE_TYPES = [
   "none",
 ] as const;
 
+/** Physical container the item comes in. Drives the save-button unit label. */
+export const CONTAINERS = [
+  "can",
+  "box",
+  "bag",
+  "bottle",
+  "jar",
+  "pack",
+  "carton",
+  "item",
+] as const;
+export type Container = (typeof CONTAINERS)[number];
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const labelReadSchema = z.object({
@@ -21,6 +34,9 @@ export const labelReadSchema = z.object({
   // Kept as a free string here; normalized to a taxonomy value | "Uncategorized"
   // after parsing (R10.2/R10.3), since structured outputs don't guarantee casing.
   category: z.string(),
+  // Physical container of a single unit. Normalized to a CONTAINERS value after
+  // parse; drives the "Save N cans" button label (per-category fallback applies).
+  container: z.enum(CONTAINERS).nullable(),
   is_food: z.boolean(),
   doesnt_expire: z.boolean(),
   perishable: z.boolean(),

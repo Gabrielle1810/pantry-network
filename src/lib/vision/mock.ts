@@ -10,6 +10,7 @@ function fixture(overrides: Partial<LabelRead>): LabelRead {
     brand: null,
     size_text: null,
     category: "Uncategorized",
+    container: null,
     is_food: true,
     doesnt_expire: false,
     perishable: false,
@@ -34,6 +35,7 @@ export const MOCK_FIXTURES: Record<string, LabelRead> = {
     brand: "Campus Brand",
     size_text: "15 oz",
     category: "Canned Goods",
+    container: "can",
     date_raw: "BEST BY 06/2027",
     date_type: "best_by",
     expires_on: "2027-06-30",
@@ -49,6 +51,7 @@ export const MOCK_FIXTURES: Record<string, LabelRead> = {
   ambiguous_date: fixture({
     name: "Tomato sauce, canned, 14 oz",
     category: "Sauces/Pastes/Spread",
+    container: "can",
     date_raw: "06/12/27",
     date_type: "unlabeled",
     expires_on: null,
@@ -59,6 +62,7 @@ export const MOCK_FIXTURES: Record<string, LabelRead> = {
   non_food: fixture({
     name: "Bar soap",
     category: "Hygiene Items",
+    container: "item",
     is_food: false,
     doesnt_expire: true,
     name_confidence: 0.88,
@@ -66,6 +70,7 @@ export const MOCK_FIXTURES: Record<string, LabelRead> = {
   month_only: fixture({
     name: "Pasta, spaghetti, 16 oz",
     category: "Dried Pasta/Grains",
+    container: "box",
     date_raw: "BB 03/2028",
     date_type: "best_by",
     expires_on: "2028-03-31",

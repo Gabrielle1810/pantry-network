@@ -18,7 +18,7 @@ import { isWithinUploadLimit } from "@/lib/image";
 // Runs in the Node runtime (the default for route handlers), which the Gemini
 // SDK needs. No explicit `runtime` export: it conflicts with cacheComponents.
 
-const READ_TIMEOUT_MS = 15_000;
+const READ_TIMEOUT_MS = 25_000; // UI14.2: raised for slower models
 
 const requestSchema = z.object({
   imageBase64: z.string().min(1),

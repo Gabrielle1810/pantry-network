@@ -1,18 +1,31 @@
 "use client";
 
-// TEMPORARY recognition-test page. Lets you photograph an item on your phone,
-// runs the browser image prep + /api/vision/read-label, and dumps the parsed
-// fields plus the raw JSON so you can eyeball real Gemini reads. Not part of
-// the final UI (Task 12 builds the real review flow); all logic stays in
-// src/lib. Protected by the PIN gate via middleware (/intake/*).
+// TEMPORARY recognition + save test page. Photographs an item, runs
+// /api/vision/read-label, then lets you edit the key fields and Save to
+// /api/items so persistence (Supabase on Vercel, memory locally) can be tested
+// end to end. The real designed flow is Phase 2; all logic stays in src/lib.
+// Protected by the PIN gate via middleware (/intake/*).
 import { useState } from "react";
 import { prepareImage, type PreparedImage } from "@/lib/image";
 import type { LabelRead } from "@/lib/vision";
+import { resolveUnit, pluralizeUnit } from "@/lib/items/units";
 
 interface ReadResponse {
   status: "ok" | "unreadable";
   provider: string;
   read?: LabelRead;
+}
+
+interface SaveResponse {
+  batch?: { id: string; name: string; quantity: number; unit: string; received_on: string };
+  totals?: { before: number; added: number; after: number; firstBatch: boolean };
+  repository?: string;
+  error?: string;
+}
+
+function uuid(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 export default function VisionTestPage() {
@@ -21,6 +34,31 @@ export default function VisionTestPage() {
   const [prep, setPrep] = useState<PreparedImage | null>(null);
   const [result, setResult] = useState<ReadResponse | null>(null);
 
+  // Editable draft fields (so corrections + totals can be exercised).
+  const [name, setName] = useState("");
+  const [brand, setBrand] = useState("");
+  const [category, setCategory] = useState("Uncategorized");
+  const [quantity, setQuantity] = useState(1);
+  // Generated lazily in event handlers (never during render — crypto.randomUUID
+  // at prerender is flagged under cacheComponents).
+  const [idempotencyKey, setIdempotencyKey] = useState<string>("");
+
+  const [saving, setSaving] = useState(false);
+  const [saveResult, setSaveResult] = useState<SaveResponse | null>(null);
+
+  const read = result?.read;
+
+  // Prefill the editable fields from a read (called from the fetch handler, not
+  // an effect, to avoid cascading-render setState-in-effect).
+  function prefillFrom(r: LabelRead | undefined) {
+    setName(r?.name ?? "");
+    setBrand(r?.brand ?? "");
+    setCategory(r?.category ?? "Uncategorized");
+    setQuantity(r?.quantity_visible ?? 1);
+    setIdempotencyKey(uuid());
+    setSaveResult(null);
+  }
+
   async function handleFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -28,6 +66,7 @@ export default function VisionTestPage() {
     setError(null);
     setResult(null);
     setPrep(null);
+    setSaveResult(null);
     try {
       const prepared = await prepareImage(file);
       setPrep(prepared);
@@ -38,6 +77,7 @@ export default function VisionTestPage() {
       });
       const json = (await res.json()) as ReadResponse;
       setResult(json);
+      prefillFrom(json.read);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -45,11 +85,72 @@ export default function VisionTestPage() {
     }
   }
 
-  const read = result?.read;
+  async function handleSave() {
+    setSaving(true);
+    setSaveResult(null);
+    const key = idempotencyKey || uuid();
+    if (!idempotencyKey) setIdempotencyKey(key);
+    try {
+      // Which product fields did staff change vs the read?
+      const editedFields: string[] = [];
+      if (read) {
+        if ((read.name ?? "") !== name) editedFields.push("name");
+        if ((read.brand ?? "") !== brand) editedFields.push("brand");
+        if ((read.category ?? "") !== category) editedFields.push("category");
+        if ((read.quantity_visible ?? 1) !== quantity) editedFields.push("quantity");
+      }
+      const unit = resolveUnit(read?.container ?? null, category);
+      const res = await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idempotencyKey: key,
+          batch: {
+            name,
+            brand: brand || null,
+            size_text: read?.size_text ?? null,
+            category,
+            category_group: null,
+            quantity,
+            unit,
+            expires_on: read?.expires_on ?? null,
+            date_type: read?.date_type ?? null,
+            date_precision: read?.date_precision ?? null,
+            date_source: read?.expires_on ? "photo" : null,
+            dont_track: false,
+            doesnt_expire: read?.doesnt_expire ?? false,
+            perishable: read?.perishable ?? false,
+            source: null,
+          },
+          read: read
+            ? {
+                name: read.name,
+                brand: read.brand,
+                category: read.category,
+                date_raw: read.date_raw,
+                expires_on: read.expires_on,
+                name_confidence: read.name_confidence,
+                date_confidence: read.date_confidence,
+              }
+            : null,
+          editedFields,
+        }),
+      });
+      const json = (await res.json()) as SaveResponse;
+      setSaveResult(json);
+    } catch (err) {
+      setSaveResult({ error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const unit = resolveUnit(read?.container ?? null, category);
+  const saveLabel = `Save ${quantity} ${pluralizeUnit(unit, quantity)}`;
 
   return (
     <main className="flex min-h-dvh flex-col gap-4 p-4">
-      <h1 className="text-xl font-semibold">Vision test</h1>
+      <h1 className="text-xl font-semibold">Vision + save test</h1>
       <p className="text-gray-600">
         Show the item&apos;s name and the date on its label.
       </p>
@@ -80,44 +181,93 @@ export default function VisionTestPage() {
       ) : null}
 
       {result ? (
-        <section className="flex flex-col gap-2">
+        <section className="flex flex-col gap-3">
           <p>
             <strong>status:</strong> {result.status} &nbsp;
             <strong>provider:</strong> {result.provider}
             {result.provider === "mock" ? " (Demo mode: sample reads)" : ""}
           </p>
 
-          {read ? (
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-              <dt className="font-medium">name</dt>
-              <dd>{read.name ?? "—"}</dd>
-              <dt className="font-medium">brand</dt>
-              <dd>{read.brand ?? "—"}</dd>
-              <dt className="font-medium">size</dt>
-              <dd>{read.size_text ?? "—"}</dd>
-              <dt className="font-medium">category</dt>
-              <dd>{read.category}</dd>
-              <dt className="font-medium">date_raw</dt>
-              <dd>{read.date_raw ?? "—"}</dd>
-              <dt className="font-medium">date_type</dt>
-              <dd>{read.date_type}</dd>
-              <dt className="font-medium">expires_on</dt>
-              <dd>{read.expires_on ?? "—"}</dd>
-              <dt className="font-medium">date_precision</dt>
-              <dd>{read.date_precision ?? "—"}</dd>
-              <dt className="font-medium">date_ambiguous</dt>
-              <dd>{String(read.date_ambiguous)}</dd>
-              <dt className="font-medium">date_candidates</dt>
-              <dd>{read.date_candidates.join(", ") || "—"}</dd>
-              <dt className="font-medium">name_confidence</dt>
-              <dd>{read.name_confidence}</dd>
-              <dt className="font-medium">date_confidence</dt>
-              <dd>{read.date_confidence}</dd>
-            </dl>
+          <fieldset className="flex flex-col gap-2 rounded border border-gray-300 p-3">
+            <legend className="font-medium">Edit &amp; save</legend>
+            <label className="flex flex-col text-sm">
+              Name
+              <input
+                className="rounded border border-gray-400 p-2"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+            <label className="flex flex-col text-sm">
+              Brand
+              <input
+                className="rounded border border-gray-400 p-2"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+              />
+            </label>
+            <label className="flex flex-col text-sm">
+              Category
+              <input
+                className="rounded border border-gray-400 p-2"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
+            </label>
+            <label className="flex flex-col text-sm">
+              Quantity
+              <input
+                type="number"
+                min={1}
+                max={999}
+                className="w-24 rounded border border-gray-400 p-2"
+                value={quantity}
+                onChange={(e) => setQuantity(Math.max(1, Math.min(999, Number(e.target.value) || 1)))}
+              />
+            </label>
+            <p className="text-xs text-gray-600">
+              expires_on: {read?.expires_on ?? "— (will save as No date)"}
+            </p>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || name.trim().length === 0}
+              className="rounded bg-gray-900 p-3 font-medium text-white disabled:opacity-50"
+            >
+              {saving ? "Saving…" : saveLabel}
+            </button>
+          </fieldset>
+
+          {saveResult ? (
+            <section className="rounded border border-green-700 p-3 text-sm">
+              {saveResult.error ? (
+                <p className="text-red-700" role="alert">
+                  Save error: {saveResult.error}
+                </p>
+              ) : (
+                <>
+                  <p>
+                    <strong>Saved.</strong> repository: {saveResult.repository}
+                  </p>
+                  {saveResult.totals ? (
+                    <p>
+                      {saveResult.totals.firstBatch
+                        ? `${saveResult.totals.added} added`
+                        : `${saveResult.totals.before} on the shelf + ${saveResult.totals.added} added = ${saveResult.totals.after}`}
+                    </p>
+                  ) : null}
+                  <p className="mt-1">
+                    <a className="text-green-700 underline" href="/intake/today">
+                      Open /intake/today
+                    </a>
+                  </p>
+                </>
+              )}
+            </section>
           ) : null}
 
           <details>
-            <summary className="cursor-pointer font-medium">Raw JSON</summary>
+            <summary className="cursor-pointer font-medium">Raw read JSON</summary>
             <pre className="overflow-x-auto rounded bg-gray-100 p-2 text-xs">
               {JSON.stringify(result, null, 2)}
             </pre>

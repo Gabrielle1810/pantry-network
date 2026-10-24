@@ -99,6 +99,37 @@ export function detectAmbiguity(raw: string | null | undefined): AmbiguityResult
   return notAmbiguous;
 }
 
+/**
+ * Today's date as an ISO "YYYY-MM-DD" string in the given IANA time zone
+ * (R7.7). Uses Intl so it never drifts to UTC. Defaults to CAMPUS_TZ env or
+ * America/New_York. A clock can be injected for deterministic tests.
+ */
+export function todayInTz(
+  tz: string = process.env.CAMPUS_TZ ?? "America/New_York",
+  now: Date = new Date(),
+): string {
+  // en-CA formats as YYYY-MM-DD, which is exactly the ISO date we want.
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  return parts; // already "YYYY-MM-DD"
+}
+
+/**
+ * Whole days from `todayIso` until `iso` (both "YYYY-MM-DD"). Positive when the
+ * target is in the future, 0 for today, negative when past. Computed on the
+ * calendar date only (no time-of-day), using UTC midnight to avoid DST drift.
+ */
+export function daysUntil(iso: string, todayIso: string): number {
+  const a = Date.parse(`${todayIso}T00:00:00Z`);
+  const b = Date.parse(`${iso}T00:00:00Z`);
+  if (Number.isNaN(a) || Number.isNaN(b)) return NaN;
+  return Math.round((b - a) / 86_400_000);
+}
+
 /** Spell out an ISO date as a human label, e.g. "2027-06-12" → "12 June 2027". */
 export function spellOut(iso: string): string {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);

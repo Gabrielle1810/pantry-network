@@ -72,10 +72,20 @@ so you can develop without a key.
 | `CAMPUS_ID` | `campus-a` | stamps saved batches |
 | `CAMPUS_TZ` | `America/New_York` | "today" + `received_on`, never UTC |
 | `VISION_PROVIDER` | `gemini` | `gemini` \| `anthropic` \| `mock` |
-| `VISION_MODEL` | `gemini-3.8-flash` | model ID for the selected provider |
+| `VISION_MODEL` | `gemini-3.5-flash-lite` | model ID for the selected provider |
 | `GEMINI_API_KEY` | — | active provider; absent ⇒ mock + startup warning |
 | `ANTHROPIC_API_KEY` | — | kept for later; used only if `VISION_PROVIDER=anthropic` |
-| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | — | both set ⇒ Supabase repo (deployed demo) |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | — | both set ⇒ Supabase repo; else in-memory. Writes use ONLY the service-role key, never the `NEXT_PUBLIC_*`/anon keys |
+
+## Persistence (Supabase)
+
+When `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are both present, the app
+uses `SupabaseRepository` (server-only); otherwise it uses an in-memory
+repository for local dev and tests. **The in-memory repository resets per
+serverless instance, so the deployed Vercel demo needs Supabase for saved
+batches, totals, and remembered fixes to persist.** Apply
+`supabase/migrations/001_items.sql` once in the Supabase SQL editor (it creates
+`items`, `intake_reads`, `product_corrections`, indexes, and enables RLS).
 
 ## Running tests
 
@@ -88,8 +98,7 @@ Tests never call the real AI API; they use a deterministic mock provider.
 
 ## API contract
 
-> _Full contract (including `/api/items`) completed in Task 17; also in
-> `.kiro/specs/intake/design.md`. The two live endpoints today:_
+> _Also mirrored in `.kiro/specs/intake/design.md`. The live endpoints:_
 
 ### `POST /api/session`
 Request `{ "pin": "1234" }`.
@@ -111,7 +120,34 @@ Request `{ "imageBase64": "<JPEG base64, no data: prefix>" }` (≤ 2 MB decoded)
 The server re-runs date-ambiguity detection on the model's `date_raw`: if a
 numeric date reads two ways, `expires_on` is forced to `null`, `date_ambiguous`
 to `true`, and both ISO candidates are returned (the model is never allowed to
-pick for the staff).
+pick for the staff). The read also includes a `container` field (can/box/bag/
+bottle/jar/pack/carton/item) used to label the save button.
+
+### `POST /api/items` (requires the session cookie)
+Save one delivery batch. Request:
+```json
+{ "idempotencyKey": "uuid",
+  "batch": { "name": "Tomato paste", "brand": "Hunt's", "size_text": null,
+    "category": "Sauces/Pastes/Spread", "category_group": null, "quantity": 4,
+    "unit": "can", "expires_on": "2026-10-26", "date_type": "best_by",
+    "date_precision": "day", "date_source": "photo", "dont_track": false,
+    "doesnt_expire": false, "perishable": false, "source": null },
+  "read": { "name": "...", "brand": "...", "category": "...", "date_raw": "...",
+    "expires_on": "...", "name_confidence": 0.9, "date_confidence": 0.8 },
+  "editedFields": ["name"] }
+```
+- `200 { "batch": <ItemBatch>, "totals": { "before", "added", "after", "firstBatch" }, "repository": "memory"|"supabase" }`
+- `400 { "error": "invalid_batch", "details": [...] }` — empty name or quantity outside 1..999.
+- `401 { "error": "unauthorized" }`.
+- `500 { "error": "save_failed" }` — a persistence error (NOT fail-soft like vision).
+
+A repeat `idempotencyKey` returns the existing batch (no duplicate). When
+`editedFields` include `name`/`brand`/`category`, the correction is remembered
+(keyed by the original read's name+brand) and prefilled on the next matching
+read. Dates are never remembered.
+
+### `GET /api/items?since=today` (requires the session cookie)
+- `200 { "repository": "memory"|"supabase", "campusId": "campus-a", "items": [ ItemBatch, ... ] }`
 
 ## License
 
