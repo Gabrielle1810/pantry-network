@@ -11,10 +11,19 @@ import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 // API prefixes that require a valid session (manager APIs). /api/session is
 // excluded so login/logout is reachable; public student APIs (added later) are
 // also excluded by not listing them here.
-const PROTECTED_API_PREFIXES = ["/api/vision", "/api/items", "/api/inventory", "/api/campus"];
+const PROTECTED_API_PREFIXES = ["/api/vision", "/api/items", "/api/inventory", "/api/campus", "/api/seed"];
 
-// Page prefixes that require a valid session.
-const PROTECTED_PAGE_PREFIXES = ["/intake"];
+// Page prefixes that require a valid session (manager pages). The public student
+// page (/s/[token]) and the QR poster are intentionally NOT listed.
+const PROTECTED_PAGE_PREFIXES = [
+  "/intake",
+  "/inventory",
+  "/add",
+  "/takeout",
+  "/community",
+  "/settings",
+  "/help",
+];
 
 function isProtectedApi(pathname: string): boolean {
   return PROTECTED_API_PREFIXES.some(
@@ -51,9 +60,16 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     "/intake/:path*",
+    "/inventory/:path*",
+    "/add/:path*",
+    "/takeout/:path*",
+    "/community/:path*",
+    "/settings/:path*",
+    "/help/:path*",
     "/api/vision/:path*",
     "/api/items/:path*",
     "/api/inventory/:path*",
     "/api/campus/:path*",
+    "/api/seed/:path*",
   ],
 };

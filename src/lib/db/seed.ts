@@ -88,10 +88,49 @@ export const CEDAR_ITEMS: SeedItemSpec[] = [
   { id: "c_granola", name: "Granola bars", brand: "Kind", unit: "bar", category: "Granola Bar/Cracker Snacks", qty: 22, of: 40, expiresOffsetDays: 95, restockOffsetDays: -22, source: "purchased" },
 ];
 
-function isoFromOffset(todayIso: string, offsetDays: number): string {
+export function isoFromOffset(todayIso: string, offsetDays: number): string {
   const ms = Date.parse(`${todayIso}T00:00:00Z`) + offsetDays * 86_400_000;
   return new Date(ms).toISOString().slice(0, 10);
 }
+
+// Community offers posted by the four non-live campuses (seen on Community but
+// with no live inventory). Ported from data.js `offers` (invented).
+export interface SeedOffer {
+  id: string;
+  campusId: string;
+  name: string;
+  unit: string;
+  qty: number;
+  category: string;
+  expiresOffsetDays: number | null;
+  noExpire?: boolean;
+}
+
+export const SEED_OFFERS: SeedOffer[] = [
+  { id: "o1", campusId: "riverside", name: "Canned corn", unit: "can", qty: 48, category: "Canned Goods", expiresOffsetDays: 15 },
+  { id: "o2", campusId: "northfield", name: "Cereal cups", unit: "cup", qty: 24, category: "Cereal", expiresOffsetDays: 83 },
+  { id: "o3", campusId: "cedar", name: "Applesauce pouches", unit: "pouch", qty: 40, category: "Fruit Cups/Pouches", expiresOffsetDays: 38 },
+  { id: "o4", campusId: "cedar", name: "Shampoo, travel size", unit: "bottle", qty: 25, category: "Hygiene Items", expiresOffsetDays: null, noExpire: true },
+  { id: "o5", campusId: "northfield", name: "Penne pasta", unit: "box", qty: 30, category: "Dried Pasta/Grains", expiresOffsetDays: null },
+  { id: "o6", campusId: "riverside", name: "Snack bars", unit: "bar", qty: 120, category: "Granola Bar/Cracker Snacks", expiresOffsetDays: 129 },
+  { id: "o7", campusId: "bayview", name: "Peanut butter", unit: "jar", qty: 12, category: "Sauces/Pastes/Spread", expiresOffsetDays: 100 },
+  { id: "o8", campusId: "hillcrest", name: "Ramen cups", unit: "cup", qty: 60, category: "Microwave cup/package", expiresOffsetDays: null },
+];
+
+// Community requests from other campuses (invented, from data.js `requests`).
+export interface SeedRequest {
+  id: string;
+  campusId: string;
+  name: string;
+  category: string;
+  qty: number;
+}
+
+export const SEED_REQUESTS: SeedRequest[] = [
+  { id: "r1", campusId: "bayview", name: "Peanut butter packets", category: "Sauces/Pastes/Spread", qty: 30 },
+  { id: "r2", campusId: "riverside", name: "Canned vegetables", category: "Canned Goods", qty: 20 },
+  { id: "r3", campusId: "cedar", name: "Toothpaste", category: "Hygiene Items", qty: 15 },
+];
 
 export interface SeededCampus {
   products: SeedProduct[];

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-// R1.4: the root path redirects to the intake entry point.
+// The manager home is Inventory (behind the PIN via middleware).
 export default function Home() {
-  redirect("/intake");
+  redirect("/inventory");
 }
