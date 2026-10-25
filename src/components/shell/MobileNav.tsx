@@ -16,7 +16,7 @@ interface CampusOption {
 export function MobileNav({ active, campuses }: { active: string; campuses: CampusOption[] }) {
   const pathname = usePathname();
   return (
-    <header className="sticky top-0 z-20 flex flex-col gap-2 border-b border-line bg-surface px-4 pb-2 pt-3 md:hidden">
+    <header className="sticky top-0 z-20 flex flex-col gap-2 border-b border-line bg-surface px-4 pb-2 pt-3 md:hidden print:hidden">
       <div className="flex items-center justify-between gap-3">
         <span className="flex items-center gap-2 font-bold">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary text-white">

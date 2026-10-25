@@ -71,8 +71,21 @@ describe("inventoryCards", () => {
     expect(cards[2].num).toBe(1);
     expect(cards[3].label).toBe("Items this period");
     expect(cards[3].num).toBe(3);
-    // PD.2: "Add items" on Running low opens Add stock prefilled with that product.
-    expect(cards[0].actions?.[0]).toEqual({ label: "Add items", href: "/add?product=Cheerios", primary: true });
+    // PD.2: Running low offers Request items (Community, prefilled) and Add items (Add stock, prefilled).
+    expect(cards[0].actions).toEqual([
+      { label: "Request items", href: "/community?request=Cheerios&category=Canned%20Goods", primary: true },
+      { label: "Add items", href: "/add?product=Cheerios" },
+    ]);
+    // Expiring soon → Offer on Community (prefilled) + See all N (tab switch).
+    expect(cards[1].actions).toEqual([
+      { label: "Offer on Community", href: "/community?offer=Tomato%20paste", primary: true },
+      { label: "See all 1", tab: "soon" },
+    ]);
+    // Expired → Mark as removed opens Record items out; See list switches tab.
+    expect(cards[2].actions).toEqual([
+      { label: "Mark as removed", href: "/takeout?remove=expired", primary: true },
+      { label: "See list", tab: "expired" },
+    ]);
   });
 });
 

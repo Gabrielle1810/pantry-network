@@ -5,8 +5,20 @@ import { getMemoryAppRepository } from "./app-memory";
 import { SupabaseAppRepository } from "./app-supabase";
 import type { AppRepository } from "./app-types";
 
-export type { AppRepository, InventoryRow, IntakeInput, IntakeResult } from "./app-types";
-export { MemoryAppRepository, getMemoryAppRepository } from "./app-memory";
+export type {
+  AppRepository,
+  InventoryRow,
+  IntakeInput,
+  IntakeResult,
+  CampusInfo,
+  CountCheckView,
+  CreateOfferInput,
+  RecordOutInput,
+  RecordOutResult,
+  StudentTakeoutInput,
+  StudentTakeoutResult,
+} from "./app-types";
+export { MemoryAppRepository, getMemoryAppRepository, resetMemoryAppRepository } from "./app-memory";
 export { SupabaseAppRepository } from "./app-supabase";
 
 /** `todayIso` anchors the memory repo's relative seed dates (PB.6). */

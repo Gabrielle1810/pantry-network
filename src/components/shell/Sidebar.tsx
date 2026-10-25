@@ -34,7 +34,7 @@ export function Sidebar({ active, campuses }: { active: string; campuses: Campus
   };
 
   return (
-    <aside className="sticky top-0 hidden h-dvh w-[232px] flex-none flex-col gap-5 border-r border-line bg-surface p-4 md:flex">
+    <aside className="sticky top-0 hidden h-dvh w-[232px] flex-none flex-col gap-5 border-r border-line bg-surface p-4 md:flex print:hidden">
       <div className="flex items-center gap-2.5 p-1 text-[17px] font-bold">
         <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary text-white">
           <Icon name="package" size={16} />

@@ -11,7 +11,14 @@ import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 // API prefixes that require a valid session (manager APIs). /api/session is
 // excluded so login/logout is reachable; public student APIs (added later) are
 // also excluded by not listing them here.
-const PROTECTED_API_PREFIXES = ["/api/vision", "/api/items", "/api/inventory", "/api/campus", "/api/seed"];
+const PROTECTED_API_PREFIXES = [
+  "/api/vision",
+  "/api/items",
+  "/api/inventory",
+  "/api/campus",
+  "/api/seed",
+  "/api/takeout",
+];
 
 // Page prefixes that require a valid session (manager pages). The public student
 // page (/s/[token]) and the QR poster are intentionally NOT listed.
@@ -23,6 +30,7 @@ const PROTECTED_PAGE_PREFIXES = [
   "/community",
   "/settings",
   "/help",
+  "/poster",
 ];
 
 function isProtectedApi(pathname: string): boolean {
@@ -66,6 +74,8 @@ export const config = {
     "/community/:path*",
     "/settings/:path*",
     "/help/:path*",
+    "/poster/:path*",
+    "/api/takeout/:path*",
     "/api/vision/:path*",
     "/api/items/:path*",
     "/api/inventory/:path*",

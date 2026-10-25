@@ -47,7 +47,7 @@ export function InventoryView({
         </span>
       </header>
 
-      <SmartCards cards={cards} />
+      <SmartCards cards={cards} onTab={setTab} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Inventory filters">

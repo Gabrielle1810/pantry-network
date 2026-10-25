@@ -10,22 +10,16 @@
 // Dates are SEEDED RELATIVE TO TODAY (PB.6) so "expires in 2 days" still holds on
 // demo day. Each item carries a `expiresOffsetDays` (days from today, or null)
 // and `restockOffsetDays` (negative = in the past) instead of fixed dates.
+//
+// The plan (buildSeedPlan) is store-agnostic: the in-memory store and the
+// Supabase seed both load the same plan, so local dev and the live demo match.
+// Demo feed entries ("Out today") are seeded as ledger rows in groups; an older
+// batch of equal size keeps each product's derived on-shelf equal to its qty.
 import { correctionKey } from "@/lib/corrections";
-import type { Batch, Ledger } from "@/lib/stock";
-
-export interface SeedProduct {
-  id: string;
-  campusId: string;
-  productKey: string;
-  name: string;
-  brand: string | null;
-  unit: string;
-  category: string;
-  categoryGroup?: string | null;
-  sizeText?: string | null;
-  noExpire: boolean;
-  source: "donated" | "purchased";
-}
+import { categoryGroup } from "@/lib/items/taxonomy";
+import { startOfDayMs } from "@/lib/dates";
+import type { LedgerKind } from "@/lib/stock";
+import type { LedgerSource, NewProduct } from "./store";
 
 export interface SeedItemSpec {
   id: string;
@@ -95,11 +89,42 @@ export function isoFromOffset(todayIso: string, offsetDays: number): string {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
-// Community offers posted by the four non-live campuses (seen on Community but
-// with no live inventory). Ported from data.js `offers` (invented).
+// ---------------------------------------------------------------------------
+// Demo "Out today" feed for harbor (ported from data.js, with NO names). Staff
+// reasons are stable codes. `minutesAgo` is relative to when the seed runs.
+// ---------------------------------------------------------------------------
+export interface SeedFeedEntry {
+  id: string;
+  minutesAgo: number;
+  source: "student" | "staff";
+  reason?: "expired" | "damaged" | "given_out";
+  lines: { ref: string; qty: number }[];
+}
+
+export const HARBOR_FEED: SeedFeedEntry[] = [
+  { id: "f1", minutesAgo: 2, source: "student", lines: [{ ref: "beans", qty: 2 }, { ref: "ramen", qty: 1 }] },
+  { id: "f2", minutesAgo: 10, source: "staff", reason: "expired", lines: [{ ref: "cookiemix", qty: 1 }, { ref: "chickarina", qty: 1 }] },
+  { id: "f3", minutesAgo: 14, source: "student", lines: [{ ref: "rice", qty: 1 }] },
+  { id: "f4", minutesAgo: 25, source: "staff", reason: "given_out", lines: [{ ref: "beans", qty: 2 }] },
+  { id: "f5", minutesAgo: 41, source: "student", lines: [{ ref: "pb", qty: 3 }, { ref: "applesauce", qty: 2 }] },
+  { id: "f6", minutesAgo: 60, source: "student", lines: [{ ref: "ramen", qty: 2 }, { ref: "soymilk", qty: 1 }, { ref: "granola", qty: 2 }] },
+  { id: "f7", minutesAgo: 64, source: "student", lines: [{ ref: "beans", qty: 3 }] },
+  { id: "f8", minutesAgo: 95, source: "student", lines: [{ ref: "ramen", qty: 4 }, { ref: "crackers", qty: 2 }] },
+  { id: "f9", minutesAgo: 130, source: "student", lines: [{ ref: "macncheese", qty: 2 }, { ref: "ramen", qty: 3 }] },
+  { id: "f10", minutesAgo: 180, source: "staff", reason: "damaged", lines: [{ ref: "oatmeal", qty: 2 }] },
+  { id: "f11", minutesAgo: 240, source: "student", lines: [{ ref: "ramen", qty: 2 }, { ref: "pbmilk", qty: 1 }] },
+];
+
+// ---------------------------------------------------------------------------
+// Community: offers from the four sample campuses, plus two cedar offers that
+// are backed by real cedar inventory (so a pickup really moves stock). Requests
+// from other campuses. All invented.
+// ---------------------------------------------------------------------------
 export interface SeedOffer {
   id: string;
   campusId: string;
+  /** Seed item ref of a live campus's product that backs (reserves for) this offer. */
+  productRef?: string;
   name: string;
   unit: string;
   qty: number;
@@ -111,15 +136,14 @@ export interface SeedOffer {
 export const SEED_OFFERS: SeedOffer[] = [
   { id: "o1", campusId: "riverside", name: "Canned corn", unit: "can", qty: 48, category: "Canned Goods", expiresOffsetDays: 15 },
   { id: "o2", campusId: "northfield", name: "Cereal cups", unit: "cup", qty: 24, category: "Cereal", expiresOffsetDays: 83 },
-  { id: "o3", campusId: "cedar", name: "Applesauce pouches", unit: "pouch", qty: 40, category: "Fruit Cups/Pouches", expiresOffsetDays: 38 },
-  { id: "o4", campusId: "cedar", name: "Shampoo, travel size", unit: "bottle", qty: 25, category: "Hygiene Items", expiresOffsetDays: null, noExpire: true },
+  { id: "o3", campusId: "cedar", productRef: "c_corn", name: "Canned corn", unit: "can", qty: 20, category: "Canned Goods", expiresOffsetDays: 15 },
+  { id: "o4", campusId: "cedar", productRef: "c_soap", name: "Bar soap", unit: "pack", qty: 5, category: "Hygiene Items", expiresOffsetDays: null, noExpire: true },
   { id: "o5", campusId: "northfield", name: "Penne pasta", unit: "box", qty: 30, category: "Dried Pasta/Grains", expiresOffsetDays: null },
   { id: "o6", campusId: "riverside", name: "Snack bars", unit: "bar", qty: 120, category: "Granola Bar/Cracker Snacks", expiresOffsetDays: 129 },
   { id: "o7", campusId: "bayview", name: "Peanut butter", unit: "jar", qty: 12, category: "Sauces/Pastes/Spread", expiresOffsetDays: 100 },
   { id: "o8", campusId: "hillcrest", name: "Ramen cups", unit: "cup", qty: 60, category: "Microwave cup/package", expiresOffsetDays: null },
 ];
 
-// Community requests from other campuses (invented, from data.js `requests`).
 export interface SeedRequest {
   id: string;
   campusId: string;
@@ -134,63 +158,165 @@ export const SEED_REQUESTS: SeedRequest[] = [
   { id: "r3", campusId: "cedar", name: "Toothpaste", category: "Hygiene Items", qty: 15 },
 ];
 
-export interface SeededCampus {
-  products: SeedProduct[];
-  batches: Batch[];
-  ledger: Ledger[];
+/** A sample "Count looks off": staff counted fewer than the system says. */
+export const SEED_COUNT_CHECKS = [{ id: "cc1", campusId: "harbor", ref: "ramen", counted: 7 }];
+
+// ---------------------------------------------------------------------------
+// The plan
+// ---------------------------------------------------------------------------
+export interface PlanBatch {
+  key: string;
+  quantity: number;
+  receivedOn: string;
+  expiresOn: string | null;
+  createdAt: string;
+}
+export interface PlanLedger {
+  key: string;
+  delta: number;
+  kind: LedgerKind;
+  source: LedgerSource;
+  reason: string | null;
+  groupKey: string | null;
+  createdAt: string;
+}
+export interface PlanItem {
+  ref: string;
+  product: NewProduct;
+  batches: PlanBatch[];
+  ledger: PlanLedger[];
+}
+export interface PlanOffer {
+  id: string;
+  campusId: string;
+  productRef: string | null;
+  name: string;
+  unit: string;
+  qty: number;
+  category: string;
+  expiresOn: string | null;
+  noExpire: boolean;
+}
+export interface SeedPlan {
+  campuses: { campusId: string; items: PlanItem[] }[];
+  offers: PlanOffer[];
+  requests: SeedRequest[];
+  counts: { id: string; campusId: string; ref: string; counted: number }[];
 }
 
-/**
- * Turn item specs into products + batches + balancing ledger entries for a
- * campus, so derived on-shelf == qty and lastRestockAmount == of. `todayIso`
- * anchors the relative dates (PB.6).
- */
-export function seedCampus(campusId: string, specs: SeedItemSpec[], todayIso: string): SeededCampus {
-  const products: SeedProduct[] = [];
-  const batches: Batch[] = [];
-  const ledger: Ledger[] = [];
+/** A stable uuid-shaped id from a string (not secret; for seed rows only). */
+export function stableUuid(key: string): string {
+  let h = 0x811c9dc5;
+  const bytes: number[] = [];
+  for (let i = 0; i < 16; i++) {
+    for (let j = 0; j < key.length; j++) {
+      h ^= key.charCodeAt(j) + i;
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    bytes.push(h & 0xff);
+  }
+  const hex = bytes.map((b) => b.toString(16).padStart(2, "0"));
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10, 16).join("")}`;
+}
 
-  for (const s of specs) {
-    const productKey = correctionKey(s.name, s.brand);
-    const productId = `${campusId}:${s.id}`;
+function planCampus(
+  campusId: string,
+  specs: SeedItemSpec[],
+  feed: SeedFeedEntry[],
+  todayIso: string,
+  nowMs: number,
+  dayStart: number,
+): PlanItem[] {
+  // Per-product total of feed outflow, so an equal older batch keeps on-shelf == qty.
+  const fed = new Map<string, number>();
+  for (const e of feed) for (const l of e.lines) fed.set(l.ref, (fed.get(l.ref) ?? 0) + l.qty);
+
+  return specs.map((s) => {
     const receivedOn = isoFromOffset(todayIso, s.restockOffsetDays);
     const expiresOn = s.expiresOffsetDays === null ? null : isoFromOffset(todayIso, s.expiresOffsetDays);
-
-    products.push({
-      id: productId,
+    const group = categoryGroup(s.category);
+    const product: NewProduct = {
       campusId,
-      productKey,
+      productKey: correctionKey(s.name, s.brand),
       name: s.name,
       brand: s.brand || null,
-      unit: s.unit,
+      sizeText: null,
       category: s.category,
+      categoryGroup: group,
+      unit: s.unit,
       noExpire: !!s.noExpire,
       source: s.source,
-    });
+    };
 
-    // One intake batch sized to the last restock amount (`of`).
-    batches.push({
-      id: `${productId}:b0`,
-      productKey: productId, // scope batches/ledger to the product id
-      quantity: s.of,
-      receivedOn,
-      createdAt: `${receivedOn}T10:00:00.000Z`,
-      expiresOn,
-    });
+    const batches: PlanBatch[] = [
+      { key: `seed:${campusId}:${s.id}:b0`, quantity: s.of, receivedOn, expiresOn, createdAt: `${receivedOn}T10:00:00.000Z` },
+    ];
+    const earlier = fed.get(s.id) ?? 0;
+    if (earlier > 0) {
+      const olderOn = isoFromOffset(todayIso, s.restockOffsetDays - 14);
+      batches.push({ key: `seed:${campusId}:${s.id}:b-1`, quantity: earlier, receivedOn: olderOn, expiresOn, createdAt: `${olderOn}T10:00:00.000Z` });
+    }
 
-    // Balancing take-out so derived on-shelf == qty (of - qty already consumed).
+    const ledger: PlanLedger[] = [];
     const consumed = s.of - s.qty;
     if (consumed > 0) {
       ledger.push({
-        id: `${productId}:seedout`,
-        productKey: productId,
+        key: `seed:${campusId}:${s.id}:out`,
         delta: -consumed,
         kind: "takeout",
-        at: `${receivedOn}T12:00:00.000Z`,
+        source: "system",
+        reason: "Seed baseline",
+        groupKey: null,
         createdAt: `${receivedOn}T12:00:00.000Z`,
       });
     }
-  }
+    for (const [i, e] of feed.entries()) {
+      const line = e.lines.find((l) => l.ref === s.id);
+      if (!line) continue;
+      const natural = nowMs - e.minutesAgo * 60_000;
+      const clamped = Math.min(nowMs, Math.max(natural, dayStart + 60_000 + (300 - Math.min(e.minutesAgo, 299)) * 1_000 + i));
+      ledger.push({
+        key: `seed:${campusId}:feed:${e.id}:${s.id}`,
+        delta: -line.qty,
+        kind: e.source === "student" ? "takeout" : "removal",
+        source: e.source,
+        reason: e.reason ?? null,
+        groupKey: `feed:${campusId}:${e.id}`,
+        createdAt: new Date(clamped).toISOString(),
+      });
+    }
+    return { ref: s.id, product, batches, ledger };
+  });
+}
 
-  return { products, batches, ledger };
+/** Everything the demo needs, with dates relative to `todayIso` / `nowMs`. */
+export function buildSeedPlan(
+  todayIso: string,
+  nowMs: number = Date.now(),
+  tz: string = process.env.CAMPUS_TZ ?? "America/New_York",
+): SeedPlan {
+  const dayStart = startOfDayMs(tz, nowMs);
+  const offerSpecs = [...HARBOR_ITEMS.map((s) => ({ campus: "harbor", s })), ...CEDAR_ITEMS.map((s) => ({ campus: "cedar", s }))];
+  return {
+    campuses: [
+      { campusId: "harbor", items: planCampus("harbor", HARBOR_ITEMS, HARBOR_FEED, todayIso, nowMs, dayStart) },
+      { campusId: "cedar", items: planCampus("cedar", CEDAR_ITEMS, [], todayIso, nowMs, dayStart) },
+    ],
+    offers: SEED_OFFERS.map((o) => {
+      const backing = o.productRef ? offerSpecs.find((x) => x.campus === o.campusId && x.s.id === o.productRef)?.s : undefined;
+      return {
+        id: o.id,
+        campusId: o.campusId,
+        productRef: backing ? o.productRef! : null,
+        name: o.name,
+        unit: o.unit,
+        qty: o.qty,
+        category: o.category,
+        expiresOn: o.expiresOffsetDays === null ? null : isoFromOffset(todayIso, o.expiresOffsetDays),
+        noExpire: !!o.noExpire,
+      };
+    }),
+    requests: SEED_REQUESTS,
+    counts: SEED_COUNT_CHECKS,
+  };
 }

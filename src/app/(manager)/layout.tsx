@@ -16,7 +16,7 @@ export default function ManagerLayout({ children }: { children: React.ReactNode 
       <Suspense fallback={<div className="hidden w-[232px] flex-none border-r border-line bg-surface md:block" />}>
         <ShellNav />
       </Suspense>
-      <main className="flex min-w-0 flex-1 flex-col gap-5 bg-surface px-4 pb-24 pt-5 md:px-7 md:pt-6">{children}</main>
+      <main className="flex min-w-0 flex-1 flex-col gap-5 bg-surface px-4 pb-24 pt-5 md:px-7 md:pt-6 print:p-0">{children}</main>
     </div>
   );
 }

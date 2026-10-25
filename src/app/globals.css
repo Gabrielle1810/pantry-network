@@ -55,6 +55,12 @@
   }
 }
 
+/* Keep the page from shifting sideways when a modal locks scrolling or a
+   scrollbar appears (PG.1: no layout shift). */
+html {
+  scrollbar-gutter: stable;
+}
+
 /* Visible keyboard focus everywhere (PG.3), matching the prototype. */
 :focus-visible {
   outline: 2px solid var(--color-green);

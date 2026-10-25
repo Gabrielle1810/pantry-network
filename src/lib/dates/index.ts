@@ -130,6 +130,39 @@ export function daysUntil(iso: string, todayIso: string): number {
   return Math.round((b - a) / 86_400_000);
 }
 
+/** The calendar date (ISO) an instant falls on in the given time zone. */
+export function localDateOf(
+  instant: string | number | Date,
+  tz: string = process.env.CAMPUS_TZ ?? "America/New_York",
+): string {
+  return todayInTz(tz, new Date(instant));
+}
+
+/**
+ * Epoch ms of local midnight (start of "today") in the given zone. Binary
+ * search over the last 25 hours, so it is correct across DST changes.
+ */
+export function startOfDayMs(
+  tz: string = process.env.CAMPUS_TZ ?? "America/New_York",
+  now: number = Date.now(),
+): number {
+  const day = todayInTz(tz, new Date(now));
+  let lo = now - 25 * 3_600_000; // an earlier calendar date
+  let hi = now; // today
+  while (hi - lo > 1000) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (todayInTz(tz, new Date(mid)) === day) hi = mid;
+    else lo = mid;
+  }
+  return hi;
+}
+
+/** Full month name of an ISO date, e.g. "2026-12-01" → "December". */
+export function monthNameOf(iso: string): string {
+  const m = iso.match(/^\d{4}-(\d{2})-\d{2}$/);
+  return m ? (MONTHS[Number(m[1]) - 1] ?? "") : "";
+}
+
 /** US short date for display, e.g. "2026-10-26" → "10/26/2026". */
 export function formatUs(iso: string | null | undefined): string {
   if (!iso) return "";

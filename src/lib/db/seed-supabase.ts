@@ -1,33 +1,22 @@
-// Idempotent Supabase seeding (Step 2). Writes the sample data — two live
-// campuses (harbor full, cedar smaller), the four Community-only campuses, and
-// their offers/requests — into Supabase. SERVER-ONLY (service-role key).
+// Idempotent Supabase seeding. SERVER-ONLY (service-role key). Loads the shared
+// seed plan: two live campuses (harbor full, cedar smaller), the four
+// Community-only campuses, the demo "Out today" feed, offers, requests and a
+// sample count check.
 //
-// Idempotency (so running twice duplicates nothing, and Settings "Reset demo
-// data" can reuse it):
-//  * campuses: upsert by id. student_token is generated with crypto ONLY when
-//    the campus has none yet, so re-seeding never rotates a live token and no
-//    token is ever hard-coded in the repo (PI.1).
-//  * products: upsert by (campus_id, product_key).
-//  * batches/ledger: carry a deterministic `idempotency_key` ("seed:..."); a
-//    re-insert hits the partial unique index (23505) and is skipped. Counts in
-//    the result are rows newly inserted by this run.
-//  * offers/requests: deleted-then-reinserted for the seed set so counts stay
-//    stable (they belong only to sample campuses).
-import { randomUUID, randomBytes } from "node:crypto";
+//  * Default run: adds only what is missing (keyed rows are skipped), so running
+//    it twice duplicates nothing and never rolls back live changes.
+//  * reset: first deletes ALL data for the six sample campuses (stock, ledger,
+//    offers, requests, pickups, held submissions, device log, count checks,
+//    remembered fixes), then seeds fresh. Student tokens are kept so printed
+//    posters stay valid.
+//  * student_token is generated with crypto ONLY for a campus that has none, so
+//    no token is ever hard-coded in the repo (PI.1).
+//
+// Needs migrations 002, 003 and 004.
+import { randomBytes } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { CAMPUSES } from "@/lib/campus";
-import { categoryGroup } from "@/lib/items/taxonomy";
-import { correctionKey } from "@/lib/corrections";
-import {
-  HARBOR_ITEMS,
-  CEDAR_ITEMS,
-  SEED_OFFERS,
-  SEED_REQUESTS,
-  isoFromOffset,
-  type SeedItemSpec,
-} from "./seed";
-
-const UNIQUE_VIOLATION = "23505";
+import { buildSeedPlan, stableUuid } from "./seed";
 
 export interface SeedResult {
   campuses: number;
@@ -36,181 +25,154 @@ export interface SeedResult {
   ledger: number;
   offers: number;
   requests: number;
-  tokens: Record<string, string>; // campusId → student_token (for the poster URL)
+  countChecks: number;
+  reset: boolean;
+  /** campusId → student_token (for the student URL / poster). */
+  tokens: Record<string, string>;
 }
 
 function newToken(): string {
   return randomBytes(24).toString("base64url"); // unguessable, URL-safe
 }
 
-export async function seedSupabase(url: string, serviceRoleKey: string, todayIso: string): Promise<SeedResult> {
+function check(label: string, error: { message: string } | null) {
+  if (error) throw new Error(`seed ${label}: ${error.message}`);
+}
+
+export async function seedSupabase(
+  url: string,
+  serviceRoleKey: string,
+  todayIso: string,
+  opts: { reset?: boolean; nowMs?: number } = {},
+): Promise<SeedResult> {
   const db: SupabaseClient = createClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  const ids = Object.keys(CAMPUSES);
 
-  const tokens: Record<string, string> = {};
+  if (opts.reset) {
+    // Children before parents. Products cascade to batches, ledger and checks.
+    const steps: [string, string][] = [
+      ["pickups", "from_campus"],
+      ["pickups", "to_campus"],
+      ["offers", "campus_id"],
+      ["requests", "campus_id"],
+      ["held_submissions", "campus_id"],
+      ["student_submissions", "campus_id"],
+      ["count_checks", "campus_id"],
+      ["product_corrections", "campus_id"],
+      ["products", "campus_id"],
+    ];
+    for (const [table, column] of steps) {
+      const { error } = await db.from(table).delete().in(column, ids);
+      check(`reset ${table}`, error);
+    }
+  }
 
   // --- campuses: upsert, preserving any existing student_token ---
-  const { data: existing } = await db.from("campuses").select("id, student_token");
-  const existingTokens = new Map<string, string>((existing ?? []).map((c) => [c.id, c.student_token]));
-
+  const { data: existing, error: ee } = await db.from("campuses").select("id, student_token");
+  check("read campuses", ee);
+  const existingTokens = new Map<string, string>((existing ?? []).map((c) => [c.id as string, c.student_token as string]));
+  const tokens: Record<string, string> = {};
   const campusRows = Object.values(CAMPUSES).map((c) => {
     const token = existingTokens.get(c.id) ?? newToken();
     tokens[c.id] = token;
     return {
-      id: c.id,
-      name: c.name,
-      region: c.region,
-      miles: c.miles,
-      place: c.place ?? null,
-      hours: c.hours ?? null,
-      contact: c.contact ?? null,
-      live: c.live,
-      student_token: token,
+      id: c.id, name: c.name, region: c.region, miles: c.miles, place: c.place ?? null,
+      hours: c.hours ?? null, contact: c.contact ?? null, live: c.live, student_token: token,
     };
   });
-  const { error: ce } = await db.from("campuses").upsert(campusRows, { onConflict: "id" });
-  if (ce) throw new Error(`seed campuses: ${ce.message}`);
+  check("campuses", (await db.from("campuses").upsert(campusRows, { onConflict: "id" })).error);
 
-  // --- products + batches + balancing ledger for the two live campuses ---
-  let productCount = 0;
-  let batchCount = 0;
-  let ledgerCount = 0;
+  const plan = buildSeedPlan(todayIso, opts.nowMs ?? Date.now());
+  const productIds = new Map<string, string>(); // "campus:ref" → product uuid
+  const counts = { products: 0, batches: 0, ledger: 0, offers: 0, requests: 0, countChecks: 0 };
 
-  async function seedItems(campusId: string, specs: SeedItemSpec[]) {
-    for (const s of specs) {
-      const productKey = correctionKey(s.name, s.brand);
-      // Upsert the product, then read its id back.
-      const { error: pe } = await db.from("products").upsert(
-        {
-          campus_id: campusId,
-          product_key: productKey,
-          name: s.name,
-          brand: s.brand || null,
-          category: s.category,
-          category_group: categoryGroup(s.category),
-          unit: s.unit,
-          no_expire: !!s.noExpire,
-          source: s.source,
-        },
+  for (const { campusId, items } of plan.campuses) {
+    // Products: one upsert (full unique constraint on campus_id + product_key).
+    const { data: prods, error: pe } = await db
+      .from("products")
+      .upsert(
+        items.map(({ product: p }) => ({
+          campus_id: campusId, product_key: p.productKey, name: p.name, brand: p.brand, size_text: p.sizeText,
+          category: p.category, category_group: p.categoryGroup, unit: p.unit, no_expire: p.noExpire, source: p.source,
+        })),
         { onConflict: "campus_id,product_key" },
-      );
-      if (pe) throw new Error(`seed product ${s.name}: ${pe.message}`);
-      productCount++;
-
-      const { data: prod, error: ge } = await db
-        .from("products")
-        .select("id")
-        .eq("campus_id", campusId)
-        .eq("product_key", productKey)
-        .single();
-      if (ge || !prod) throw new Error(`seed product lookup ${s.name}: ${ge?.message}`);
-      const productId = prod.id as string;
-
-      const receivedOn = isoFromOffset(todayIso, s.restockOffsetDays);
-      const expiresOn = s.expiresOffsetDays === null ? null : isoFromOffset(todayIso, s.expiresOffsetDays);
-
-      // Intake batch sized to `of`. The idempotency index is PARTIAL, which
-      // ON CONFLICT can't target, so insert and treat a duplicate key (23505)
-      // as "already seeded".
-      const { error: be } = await db.from("item_batches").insert({
-        campus_id: campusId,
-        product_id: productId,
-        quantity: s.of,
-        received_on: receivedOn,
-        expires_on: expiresOn,
-        date_type: null,
-        date_precision: null,
-        date_source: "imported",
-        idempotency_key: `seed:${campusId}:${s.id}:b0`,
-      });
-      if (be && be.code !== UNIQUE_VIOLATION) throw new Error(`seed batch ${s.name}: ${be.message}`);
-      if (!be) batchCount++;
-
-      // Balancing take-out so derived on-shelf == qty.
-      const consumed = s.of - s.qty;
-      if (consumed > 0) {
-        const { error: le } = await db.from("ledger_entries").insert({
-          campus_id: campusId,
-          product_id: productId,
-          delta: -consumed,
-          kind: "takeout",
-          source: "system",
-          reason: "Seed baseline",
-          idempotency_key: `seed:${campusId}:${s.id}:out`,
-        });
-        if (le && le.code !== UNIQUE_VIOLATION) throw new Error(`seed ledger ${s.name}: ${le.message}`);
-        if (!le) ledgerCount++;
-      }
+      )
+      .select("id, product_key");
+    check(`products (${campusId})`, pe);
+    const byKey = new Map((prods ?? []).map((r) => [r.product_key as string, r.id as string]));
+    for (const item of items) {
+      const id = byKey.get(item.product.productKey);
+      if (!id) throw new Error(`seed products (${campusId}): missing ${item.ref}`);
+      productIds.set(`${campusId}:${item.ref}`, id);
     }
+    counts.products += items.length;
+
+    // Batches: insert only the ones whose seed key isn't there yet.
+    const { data: haveB, error: hb } = await db
+      .from("item_batches").select("idempotency_key").eq("campus_id", campusId).like("idempotency_key", "seed:%");
+    check(`read batches (${campusId})`, hb);
+    const doneB = new Set((haveB ?? []).map((r) => r.idempotency_key as string));
+    const newBatches = items.flatMap((item) =>
+      item.batches.filter((b) => !doneB.has(b.key)).map((b) => ({
+        campus_id: campusId, product_id: productIds.get(`${campusId}:${item.ref}`)!, quantity: b.quantity,
+        received_on: b.receivedOn, expires_on: b.expiresOn, date_type: null, date_precision: null,
+        date_source: "imported", idempotency_key: b.key, created_at: b.createdAt,
+      })),
+    );
+    if (newBatches.length) check(`batches (${campusId})`, (await db.from("item_batches").insert(newBatches)).error);
+    counts.batches += newBatches.length;
+
+    // Ledger: baseline take-outs and the demo feed.
+    const { data: haveL, error: hl } = await db
+      .from("ledger_entries").select("idempotency_key").eq("campus_id", campusId).like("idempotency_key", "seed:%");
+    check(`read ledger (${campusId})`, hl);
+    const doneL = new Set((haveL ?? []).map((r) => r.idempotency_key as string));
+    const newLedger = items.flatMap((item) =>
+      item.ledger.filter((l) => !doneL.has(l.key)).map((l) => ({
+        campus_id: campusId, product_id: productIds.get(`${campusId}:${item.ref}`)!, delta: l.delta, kind: l.kind,
+        source: l.source, reason: l.reason, group_id: l.groupKey ? stableUuid(l.groupKey) : null,
+        idempotency_key: l.key, created_at: l.createdAt,
+      })),
+    );
+    if (newLedger.length) check(`ledger (${campusId})`, (await db.from("ledger_entries").insert(newLedger)).error);
+    counts.ledger += newLedger.length;
   }
 
-  await seedItems("harbor", HARBOR_ITEMS);
-  await seedItems("cedar", CEDAR_ITEMS);
-
-  // --- offers + requests from the sample (non-live) campuses: replace the set ---
-  await db.from("offers").delete().in("id", SEED_OFFERS.map((o) => seedOfferId(o.id)));
-  const offerRows = SEED_OFFERS.map((o) => ({
-    id: seedOfferId(o.id),
-    campus_id: o.campusId,
-    product_id: null,
-    name: o.name,
-    unit: o.unit,
-    qty: o.qty,
-    category: o.category,
-    expires_on: o.expiresOffsetDays === null ? null : isoFromOffset(todayIso, o.expiresOffsetDays),
-    no_expire: !!o.noExpire,
-    status: "open",
-  }));
-  const { error: oe } = await db.from("offers").insert(offerRows);
-  if (oe) throw new Error(`seed offers: ${oe.message}`);
-
-  await db.from("requests").delete().in("id", SEED_REQUESTS.map((r) => seedRequestId(r.id)));
-  const requestRows = SEED_REQUESTS.map((r) => ({
-    id: seedRequestId(r.id),
-    campus_id: r.campusId,
-    name: r.name,
-    category: r.category,
-    qty: r.qty,
-  }));
-  const { error: re } = await db.from("requests").insert(requestRows);
-  if (re) throw new Error(`seed requests: ${re.message}`);
-
-  return {
-    campuses: campusRows.length,
-    products: productCount,
-    batches: batchCount,
-    ledger: ledgerCount,
-    offers: offerRows.length,
-    requests: requestRows.length,
-    tokens,
-  };
-}
-
-// Deterministic UUIDv5-ish ids for seed offers/requests so re-seeding replaces
-// the same rows. We derive a stable uuid from a namespace + the seed id.
-function seedOfferId(localId: string): string {
-  return stableUuid(`offer:${localId}`);
-}
-function seedRequestId(localId: string): string {
-  return stableUuid(`request:${localId}`);
-}
-
-// A deterministic uuid from a string (not cryptographic; just stable for seeds).
-function stableUuid(key: string): string {
-  // Simple FNV-1a → fill a uuid shape; deterministic per key.
-  let h = 0x811c9dc5;
-  const bytes: number[] = [];
-  for (let i = 0; i < 16; i++) {
-    for (let j = 0; j < key.length; j++) {
-      h ^= key.charCodeAt(j) + i;
-      h = Math.imul(h, 0x01000193) >>> 0;
-    }
-    bytes.push(h & 0xff);
+  // --- offers / requests / count checks: add the missing ones (stable ids) ---
+  async function insertMissing(table: string, rows: { id: string }[]): Promise<number> {
+    if (rows.length === 0) return 0;
+    const { data, error } = await db.from(table).select("id").in("id", rows.map((r) => r.id));
+    check(`read ${table}`, error);
+    const have = new Set((data ?? []).map((r) => r.id as string));
+    const fresh = rows.filter((r) => !have.has(r.id));
+    if (fresh.length) check(table, (await db.from(table).insert(fresh)).error);
+    return fresh.length;
   }
-  const hex = bytes.map((b) => b.toString(16).padStart(2, "0"));
-  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10, 16).join("")}`;
-}
 
-// randomUUID is kept available for any future non-deterministic seed rows.
-void randomUUID;
+  counts.offers = await insertMissing(
+    "offers",
+    plan.offers.map((o) => ({
+      id: stableUuid(`offer:${o.id}`), campus_id: o.campusId,
+      product_id: o.productRef ? (productIds.get(`${o.campusId}:${o.productRef}`) ?? null) : null,
+      name: o.name, unit: o.unit, qty: o.qty, category: o.category, expires_on: o.expiresOn,
+      no_expire: o.noExpire, status: "open",
+    })),
+  );
+  counts.requests = await insertMissing(
+    "requests",
+    plan.requests.map((r) => ({
+      id: stableUuid(`request:${r.id}`), campus_id: r.campusId, name: r.name, category: r.category, qty: r.qty,
+    })),
+  );
+  counts.countChecks = await insertMissing(
+    "count_checks",
+    plan.counts.map((c) => ({
+      id: stableUuid(`count:${c.id}`), campus_id: c.campusId,
+      product_id: productIds.get(`${c.campusId}:${c.ref}`)!, counted: c.counted, status: "open",
+    })),
+  );
+
+  return { campuses: campusRows.length, reset: !!opts.reset, tokens, ...counts };
+}

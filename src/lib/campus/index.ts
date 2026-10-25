@@ -87,6 +87,18 @@ export const LIVE_CAMPUS_IDS = Object.values(CAMPUSES)
   .filter((c) => c.live)
   .map((c) => c.id);
 
+/**
+ * Approximate distance between two campuses. The sample campuses are placed on
+ * a line by their distance from Harbor, so the distance is the difference
+ * (at least 1 mile between different campuses). Invented, for the demo.
+ */
+export function distanceMiles(fromId: string, toId: string): number {
+  if (fromId === toId) return 0;
+  const a = CAMPUSES[fromId]?.miles ?? 0;
+  const b = CAMPUSES[toId]?.miles ?? 0;
+  return Math.max(1, Math.abs(a - b));
+}
+
 /** Resolve an active-campus id to a known live campus, defaulting to home. */
 export function resolveActiveCampus(id: string | null | undefined): string {
   if (id && CAMPUSES[id]?.live) return id;

@@ -3,6 +3,7 @@
 // filter. Components render these; no business logic in the UI.
 import type { InventoryRow } from "@/lib/db/app-types";
 import { daysUntil } from "@/lib/dates";
+import { COMMUNITY_LABEL, COMMUNITY_SLUG } from "@/lib/labels";
 
 // ---- tabs ----
 export type InventoryTabKey =
@@ -43,7 +44,10 @@ export type CardTone = "red" | "blue" | "gray" | "green" | "amber";
 
 export interface SmartCardAction {
   label: string;
-  href: string;
+  /** Navigates here. */
+  href?: string;
+  /** Or switches the Inventory tab in place. */
+  tab?: InventoryTabKey;
   primary?: boolean;
 }
 
@@ -55,6 +59,16 @@ export interface SmartCardModel {
   title: string;
   sub: string;
   actions?: SmartCardAction[];
+}
+
+/** Community offer form prefilled with a product ("Offer on Community"). */
+export function communityOfferHref(productId: string): string {
+  return `/${COMMUNITY_SLUG}?offer=${encodeURIComponent(productId)}`;
+}
+
+/** Community request form prefilled ("Request items"). */
+export function communityRequestHref(name: string, category: string): string {
+  return `/${COMMUNITY_SLUG}?request=${encodeURIComponent(name)}&category=${encodeURIComponent(category)}`;
 }
 
 /** Add stock, prefilled with a product when restocking it (PD.2/PF.3). */
@@ -101,7 +115,10 @@ export function inventoryCards(rows: InventoryRow[], todayIso: string): SmartCar
           }`
         : "Every item has at least a quarter of its last restock",
       actions: lowFirst
-        ? [{ label: "Add items", href: addStockHref(lowFirst.productId), primary: true }]
+        ? [
+            { label: "Request items", href: communityRequestHref(lowFirst.name, lowFirst.category), primary: true },
+            { label: "Add items", href: addStockHref(lowFirst.productId) },
+          ]
         : [{ label: "Add stock", href: addStockHref(), primary: true }],
     },
     {
@@ -110,6 +127,12 @@ export function inventoryCards(rows: InventoryRow[], todayIso: string): SmartCar
       label: "Expiring soon",
       num: soon.length,
       title: soonFirst ? `${soonFirst.name} expires ${inDays(soonFirst.expiresOn!, todayIso)}` : "Nothing expires in the next 2 weeks",
+      actions: soonFirst
+        ? [
+            { label: `Offer on ${COMMUNITY_LABEL}`, href: communityOfferHref(soonFirst.productId), primary: true },
+            { label: `See all ${soon.length}`, tab: "soon" },
+          ]
+        : [],
       sub: soonFirst
         ? `${soonFirst.onShelf} ${soonFirst.unit} left · put them at the front so they go first`
         : "Dated items are all good for now",
@@ -123,6 +146,12 @@ export function inventoryCards(rows: InventoryRow[], todayIso: string): SmartCar
       sub: expired.length
         ? `${expired.slice(0, 2).map((r) => r.name).join(", ")}${expired.length > 2 ? ` and ${expired.length - 2} more` : ""} ${expired.length === 1 ? "is" : "are"} past the date`
         : "Students only ever see food that is still good",
+      actions: expired.length
+        ? [
+            { label: "Mark as removed", href: "/takeout?remove=expired", primary: true },
+            { label: "See list", tab: "expired" },
+          ]
+        : [],
     },
     {
       tone: "gray",
