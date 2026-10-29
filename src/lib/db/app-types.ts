@@ -5,7 +5,23 @@
 import type { Status } from "@/lib/status";
 import type { ProductCorrection } from "@/lib/corrections";
 import type { FeedEntry, FeedLine, LineInput, ReasonCode } from "@/lib/takeout";
+import type { HistoryEntry, ProductEdit } from "@/lib/inventory/edit";
 import type { OfferRec, PickupRec, RequestRec } from "./store";
+
+export interface EditProductInput {
+  campusId: string;
+  productId: string;
+  edit: ProductEdit;
+}
+
+export type EditProductResult =
+  | { status: "saved"; row: InventoryRow; changed: string[]; dateSkipped: boolean }
+  | { status: "unchanged"; row: InventoryRow }
+  | { status: "not_found" }
+  /** Another product here already has this name + brand. Nothing was changed. */
+  | { status: "conflict" }
+  /** The new on-shelf number is below what is set aside for Community. Nothing was changed. */
+  | { status: "reserved"; reserved: number };
 
 /** A product with its derived stock + status, ready for the Inventory table. */
 export interface InventoryRow {
@@ -139,6 +155,14 @@ export interface AppRepository {
   listStudentInventory(campusId: string, todayIso: string): Promise<InventoryRow[]>;
   /** One derived row, or null. */
   getProduct(campusId: string, productId: string, todayIso: string): Promise<InventoryRow | null>;
+  /** Recent history per product (newest first), for the edit drawer. */
+  listHistory(campusId: string): Promise<Record<string, HistoryEntry[]>>;
+  /**
+   * Edit drawer / Full sheet (PD.7, PD.7a, PD.10). Details are updated in place;
+   * an on-shelf change is written as an "Edited by staff" adjustment for the
+   * difference and never overwrites a stored number. Batch quantities never change.
+   */
+  editProduct(input: EditProductInput, todayIso: string): Promise<EditProductResult>;
   /** Create/reuse the product by product_key and add a batch (idempotent). */
   saveIntake(input: IntakeInput): Promise<IntakeResult>;
   /** Remembered fix for a read key (normalized read name|brand). Never dates. */

@@ -7,6 +7,7 @@ import { CAMPUSES } from "@/lib/campus";
 import type { ProductCorrection } from "@/lib/corrections";
 import { buildSeedPlan } from "./seed";
 import type {
+  BatchDatePatch,
   BatchRec,
   CampusRec,
   CountCheckRec,
@@ -23,6 +24,7 @@ import type {
   OfferRec,
   OfferStatus,
   PickupRec,
+  ProductPatch,
   ProductRec,
   RequestRec,
   Store,
@@ -130,8 +132,22 @@ export class MemoryStore implements Store {
     return { ...created };
   }
 
+  async updateProduct(id: string, patch: ProductPatch) {
+    const p = this.products.find((x) => x.id === id);
+    if (!p) return "updated" as const;
+    if (patch.productKey && this.products.some((x) => x.id !== id && x.campusId === p.campusId && x.productKey === patch.productKey)) {
+      return "conflict" as const;
+    }
+    Object.assign(p, patch);
+    return "updated" as const;
+  }
+
   async listBatches(campusId: string) {
     return this.batches.filter((b) => b.campusId === campusId).map((b) => ({ ...b }));
+  }
+
+  async updateBatchDates(campusId: string, ids: string[], date: BatchDatePatch) {
+    for (const b of this.batches) if (b.campusId === campusId && ids.includes(b.id)) Object.assign(b, date);
   }
 
   async getBatchByKey(campusId: string, key: string) {

@@ -34,6 +34,14 @@ export function lastDayOfMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
+/** True for a real calendar date written as YYYY-MM-DD (years 2000-2099). */
+export function isValidIsoDate(value: string): boolean {
+  const m = value.match(/^(20\d{2})-(\d{2})-(\d{2})$/);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  return mo >= 1 && mo <= 12 && d >= 1 && d <= lastDayOfMonth(y, mo);
+}
+
 /** Normalize a 2-digit year to 4 digits (assume 2000s for freshness dates). */
 function normalizeYear(raw: number): number {
   if (raw >= 100) return raw;

@@ -39,8 +39,8 @@ describe("MemoryAppRepository seed (decision #2: numbers match data.js)", () => 
     const rows = await repo.listInventory("harbor", TODAY);
     const tomato = rows.find((r) => r.productId === "harbor:tomato")!;
     expect(tomato.status).toBe("soon"); // seeded +2 days
-    const cheerios = rows.find((r) => r.productId === "harbor:cheerios")!;
-    expect(cheerios.status).toBe("out"); // qty 0
+    const cereal = rows.find((r) => r.productId === "harbor:oatcereal")!;
+    expect(cereal.status).toBe("out"); // qty 0
     const sauce = rows.find((r) => r.productId === "harbor:sauce")!;
     expect(sauce.status).toBe("expired"); // seeded -55 days
   });
@@ -52,8 +52,8 @@ describe("PO.4 student inventory hides expired and out", () => {
     const rows = await repo.listStudentInventory("harbor", TODAY);
     expect(rows.every((r) => r.status !== "expired")).toBe(true);
     expect(rows.every((r) => r.onShelf - r.reserved > 0)).toBe(true);
-    // cheerios (out) and sauce (expired) must not appear
-    expect(rows.find((r) => r.productId === "harbor:cheerios")).toBeUndefined();
+    // oat cereal (out) and sauce (expired) must not appear
+    expect(rows.find((r) => r.productId === "harbor:oatcereal")).toBeUndefined();
     expect(rows.find((r) => r.productId === "harbor:sauce")).toBeUndefined();
   });
 });
@@ -65,7 +65,7 @@ describe("saveIntake (Step 3: every save creates or reuses a product + adds a ba
     receivedOn: TODAY,
     product: {
       name: "Lentils",
-      brand: "Goya",
+      brand: "Golden Field",
       sizeText: null,
       category: "Dried Pasta/Grains",
       categoryGroup: null,
@@ -95,7 +95,7 @@ describe("saveIntake (Step 3: every save creates or reuses a product + adds a ba
   it("reuses an existing product by product_key (case and spaces ignored); before + added = after", async () => {
     const repo = new MemoryAppRepository(TODAY);
     const r = await repo.saveIntake(
-      input({ product: { ...input().product, name: "tomato  PASTE", brand: "HUNT'S", category: "Sauces/Pastes/Spread", unit: "can" }, quantity: 4 }),
+      input({ product: { ...input().product, name: "tomato  PASTE", brand: "VALLEY FARMS", category: "Sauces/Pastes/Spread", unit: "can" }, quantity: 4 }),
     );
     expect(r.product.id).toBe("harbor:tomato");
     expect(r.totals).toEqual({ before: 2, added: 4, after: 6, firstBatch: false });
@@ -123,9 +123,9 @@ describe("saveIntake (Step 3: every save creates or reuses a product + adds a ba
 
   it("round-trips a remembered fix per campus", async () => {
     const repo = new MemoryAppRepository(TODAY);
-    await repo.saveCorrection("harbor", "tomato pase|hunts", { name: "Tomato paste", brand: "Hunt's", category: "Sauces/Pastes/Spread" });
-    expect((await repo.getCorrection("harbor", "tomato pase|hunts"))?.name).toBe("Tomato paste");
-    expect(await repo.getCorrection("cedar", "tomato pase|hunts")).toBeNull();
+    await repo.saveCorrection("harbor", "tomato pase|valey farm", { name: "Tomato paste", brand: "Valley Farms", category: "Sauces/Pastes/Spread" });
+    expect((await repo.getCorrection("harbor", "tomato pase|valey farm"))?.name).toBe("Tomato paste");
+    expect(await repo.getCorrection("cedar", "tomato pase|valey farm")).toBeNull();
   });
 });
 

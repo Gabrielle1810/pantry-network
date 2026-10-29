@@ -10,10 +10,19 @@ import {
   activeSoonestExpiry,
   deriveOnShelf,
   lastRestockAmount,
+  remainingByBatch,
   sortFIFO,
   type Batch,
   type Ledger,
 } from "@/lib/stock";
+import {
+  BEST_BY_LABEL,
+  EDIT_REASON,
+  ON_SHELF_LABEL,
+  historyEntries,
+  planEdit,
+  type HistoryEntry,
+} from "@/lib/inventory/edit";
 import { statusOf } from "@/lib/status";
 import { isRepeatSubmission, isStudentVisible, studentAvailable } from "@/lib/student";
 import {
@@ -33,6 +42,8 @@ import type {
   CountCheckView,
   CreateOfferInput,
   CreateRequestInput,
+  EditProductInput,
+  EditProductResult,
   IntakeInput,
   IntakeResult,
   InventoryRow,
@@ -191,6 +202,83 @@ export class AppService implements AppRepository {
   async getProduct(campusId: string, productId: string, todayIso: string) {
     const rows = this.rowsFrom(campusId, todayIso, await this.snapshot(campusId));
     return rows.find((r) => r.productId === productId) ?? null;
+  }
+
+  async listHistory(campusId: string): Promise<Record<string, HistoryEntry[]>> {
+    const [batches, ledger] = await Promise.all([this.store.listBatches(campusId), this.store.listLedger(campusId)]);
+    const batchesBy = groupBy(batches, (b) => b.productId);
+    const ledgerBy = groupBy(ledger, (l) => l.productId);
+    const out: Record<string, HistoryEntry[]> = {};
+    for (const id of new Set([...batchesBy.keys(), ...ledgerBy.keys()])) {
+      out[id] = historyEntries(batchesBy.get(id) ?? [], ledgerBy.get(id) ?? []);
+    }
+    return out;
+  }
+
+  async editProduct(input: EditProductInput, todayIso: string): Promise<EditProductResult> {
+    const { campusId, productId } = input;
+    const snap = await this.snapshot(campusId);
+    const row = this.rowsFrom(campusId, todayIso, snap).find((r) => r.productId === productId);
+    if (!row) return { status: "not_found" };
+
+    const plan = planEdit(row, input.edit);
+    if (plan.changed.length === 0) return { status: "unchanged", row };
+    // Units promised to Community must stay on the shelf until they're picked up.
+    if (plan.delta < 0 && row.onShelf + plan.delta < row.reserved) return { status: "reserved", reserved: row.reserved };
+
+    // A best-by edit applies to the batches that will still have units after the adjustment.
+    let dateIds: string[] = [];
+    let dateSkipped = false;
+    if (plan.expiresOn !== undefined) {
+      const batches = snap.batches.filter((b) => b.productId === productId).map(toBatch);
+      const ledger = snap.ledger.filter((l) => l.productId === productId).map(toLedger);
+      const adjustment: Ledger = { id: "planned", productKey: productId, delta: plan.delta, kind: "recount", at: "", createdAt: "" };
+      const remaining = remainingByBatch(batches, plan.delta ? [...ledger, adjustment] : ledger);
+      dateIds = batches.filter((b) => (remaining.get(b.id) ?? 0) > 0).map((b) => b.id);
+      if (dateIds.length === 0) {
+        dateSkipped = true; // nothing on the shelf to put a date on
+        plan.changed = plan.changed.filter((c) => c !== BEST_BY_LABEL);
+        if (plan.changed.length === 0) return { status: "unchanged", row };
+      }
+    }
+
+    // Details first: a name + brand clash stops the whole edit before anything is written.
+    if (plan.details && (await this.store.updateProduct(productId, plan.details)) === "conflict") {
+      return { status: "conflict" };
+    }
+
+    const others = plan.changed.filter((c) => c !== ON_SHELF_LABEL);
+    const history = [
+      ...(plan.delta !== 0 ? [{ delta: plan.delta, reason: EDIT_REASON }] : []),
+      // Detail-only edits leave a zero-change history row so the drawer shows them.
+      ...(others.length ? [{ delta: 0, reason: `${EDIT_REASON}: ${others.join(", ")}` }] : []),
+    ];
+    if (history.length) {
+      await this.store.insertLedger(
+        history.map((h) => ({
+          campusId,
+          productId,
+          delta: h.delta,
+          kind: "recount" as const,
+          source: "staff" as const,
+          reason: h.reason,
+          groupId: null,
+          idempotencyKey: null,
+        })),
+      );
+    }
+
+    if (dateIds.length) {
+      await this.store.updateBatchDates(campusId, dateIds, {
+        expiresOn: plan.expiresOn ?? null,
+        dateType: plan.expiresOn ? "best_by" : null,
+        datePrecision: plan.expiresOn ? "day" : null,
+        dateSource: plan.expiresOn ? "typed" : null,
+      });
+    }
+
+    const updated = await this.getProduct(campusId, productId, todayIso);
+    return updated ? { status: "saved", row: updated, changed: plan.changed, dateSkipped } : { status: "not_found" };
   }
 
   // ------------------------------------------------------------------ intake

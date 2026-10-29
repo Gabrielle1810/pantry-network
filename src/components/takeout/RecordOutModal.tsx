@@ -97,7 +97,7 @@ export function RecordOutModal({
             disabled={busy || total === 0}
             onClick={submit}
           >
-            <Icon name="trash-2" size={15} />
+            <Icon name="trash" size={15} />
             {busy ? "Recording…" : recordLabel(total)}
           </button>
         </>

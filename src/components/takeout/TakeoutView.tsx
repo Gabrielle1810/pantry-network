@@ -32,6 +32,7 @@ import { COMMUNITY_SLUG } from "@/lib/labels";
 import { postTakeout } from "./api";
 import { FixModal } from "./FixModal";
 import { RecordOutModal, type RecordPreset, type RecordedInfo } from "./RecordOutModal";
+import { showRecorded } from "./recorded";
 
 const SHOWN = 7;
 const FILTERS: { key: FeedFilter; label: string }[] = [
@@ -86,19 +87,7 @@ export function TakeoutView({
   function recorded(info: RecordedInfo) {
     setRecord(null);
     router.refresh();
-    const n = info.count;
-    const noun = `${n} item${n === 1 ? "" : "s"}`;
-    const message =
-      info.reason === "moved_to_community"
-        ? `Set aside ${noun} for an offer. Your stock hasn't changed yet.`
-        : `Recorded ${noun} · ${(reasonLabel(info.reason) ?? "").toLowerCase()}`;
-    toast.show(message, {
-      undo: async () => {
-        const r = await postTakeout({ action: "undo", groupId: info.groupId, offerIds: info.offerIds });
-        router.refresh();
-        toast.show(r.ok ? "Undone" : "Too late to undo that one. Use Fix on the entry instead.");
-      },
-    });
+    showRecorded(info, toast, router.refresh);
   }
 
   async function act(key: string, body: Parameters<typeof postTakeout>[0], done: string) {

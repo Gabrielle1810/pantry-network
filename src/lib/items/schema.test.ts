@@ -3,7 +3,7 @@ import { batchInputSchema, computeArrivedExpired } from "./schema";
 
 const base = {
   name: "Tomato paste",
-  brand: "Hunt's",
+  brand: "Valley Farms",
   size_text: null,
   category: "Sauces/Pastes/Spread",
   category_group: null,

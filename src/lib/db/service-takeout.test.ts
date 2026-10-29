@@ -177,7 +177,7 @@ describe("public student take-out", () => {
   it("never takes expired, empty or reserved items", async () => {
     const { repo } = setup();
     expect((await take(repo, { submissionId: "a", productId: "harbor:sauce" })).status).toBe("empty"); // expired
-    expect((await take(repo, { submissionId: "b", productId: "harbor:cheerios" })).status).toBe("empty"); // out
+    expect((await take(repo, { submissionId: "b", productId: "harbor:oatcereal" })).status).toBe("empty"); // out
     await repo.createOffer({ campusId: "harbor", productId: "harbor:rice", qty: 4, note: null }, TODAY);
     expect((await take(repo, { submissionId: "c" })).status).toBe("empty"); // all reserved
   });

@@ -4,8 +4,8 @@ import type { LabelRead } from "@/lib/vision/schema";
 
 describe("UI9 correctionKey", () => {
   it("is case-insensitive and whitespace-normalized", () => {
-    expect(correctionKey("Tomato  Paste", "Hunt's")).toBe(
-      correctionKey("tomato paste", "HUNT'S"),
+    expect(correctionKey("Tomato  Paste", "Valley Farms")).toBe(
+      correctionKey("tomato paste", "VALLEY  FARMS"),
     );
   });
   it("includes both name and brand", () => {
@@ -16,17 +16,17 @@ describe("UI9 correctionKey", () => {
 
 const original: Pick<LabelRead, "name" | "brand" | "category"> = {
   name: "tomato pase", // misread
-  brand: "hunts",
+  brand: "valey farm",
   category: "Uncategorized",
 };
 
 describe("UI9 diffCorrection", () => {
   it("returns a correction when name/brand/category changed", () => {
-    const c = diffCorrection(original, "Tomato paste", "Hunt's", "Sauces/Pastes/Spread");
-    expect(c).toEqual({ name: "Tomato paste", brand: "Hunt's", category: "Sauces/Pastes/Spread" });
+    const c = diffCorrection(original, "Tomato paste", "Valley Farms", "Sauces/Pastes/Spread");
+    expect(c).toEqual({ name: "Tomato paste", brand: "Valley Farms", category: "Sauces/Pastes/Spread" });
   });
   it("returns null when nothing relevant changed (ignoring case/space)", () => {
-    expect(diffCorrection(original, "tomato pase", "HUNTS", "uncategorized")).toBeNull();
+    expect(diffCorrection(original, "tomato pase", "VALEY FARM", "uncategorized")).toBeNull();
   });
   it("UI9.3 never includes a date field (type-level: shape has only name/brand/category)", () => {
     const c = diffCorrection(original, "Fixed", null, null);

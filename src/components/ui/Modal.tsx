@@ -11,6 +11,20 @@ import { Icon } from "./Icon";
 const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+const LOOK = {
+  // Centered dialog on laptops, bottom sheet on phones.
+  dialog: {
+    backdrop: "grid place-items-end sm:place-items-center sm:p-4",
+    panel: "max-h-[min(92dvh,760px)] rounded-t-3xl sm:max-w-[520px] sm:rounded-2xl",
+  },
+  // Side drawer on laptops, bottom sheet on phones. Only the open animates.
+  drawer: {
+    backdrop: "flex items-end md:items-stretch md:justify-end",
+    panel:
+      "max-h-[92dvh] rounded-t-3xl motion-safe:animate-sheet-in md:h-dvh md:max-h-none md:max-w-[440px] md:rounded-none md:motion-safe:animate-drawer-in",
+  },
+} as const;
+
 export function Modal({
   title,
   subtitle,
@@ -18,14 +32,17 @@ export function Modal({
   children,
   footer,
   leading,
+  variant = "dialog",
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
   leading?: React.ReactNode;
+  variant?: keyof typeof LOOK;
 }) {
+  const look = LOOK[variant];
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
@@ -57,7 +74,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-end bg-ink/35 sm:place-items-center sm:p-4 motion-safe:animate-fade-in"
+      className={`fixed inset-0 z-50 bg-ink/35 motion-safe:animate-fade-in ${look.backdrop}`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -69,7 +86,7 @@ export function Modal({
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className="flex max-h-[min(92dvh,760px)] w-full flex-col overflow-hidden rounded-t-3xl bg-surface shadow-xl outline-none sm:max-w-[520px] sm:rounded-2xl"
+        className={`flex w-full flex-col overflow-hidden bg-surface shadow-xl outline-none ${look.panel}`}
       >
         <div className="flex items-start gap-3 px-5 pb-3 pt-5">
           {leading}
@@ -77,7 +94,7 @@ export function Modal({
             <h2 id={titleId} className="text-lg font-semibold leading-snug">
               {title}
             </h2>
-            {subtitle ? <p className="mt-0.5 text-sm text-muted">{subtitle}</p> : null}
+            {subtitle ? <div className="mt-0.5 text-sm text-muted">{subtitle}</div> : null}
           </div>
           <button
             type="button"

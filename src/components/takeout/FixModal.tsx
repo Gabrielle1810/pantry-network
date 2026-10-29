@@ -58,7 +58,7 @@ export function FixModal({
             disabled={busy}
             onClick={() => run({ action: "delete", groupId: entry.id }, "Entry deleted and stock put back")}
           >
-            <Icon name="trash-2" size={15} />
+            <Icon name="trash" size={15} />
             Delete entry
           </button>
           <button type="button" className={`${btn.base} ${btn.plain}`} onClick={onClose}>

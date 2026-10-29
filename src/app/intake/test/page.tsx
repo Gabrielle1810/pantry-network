@@ -1,10 +1,10 @@
 "use client";
 
-// TEMPORARY recognition + save test page. Photographs an item, runs
-// /api/vision/read-label, then lets you edit the key fields and Save to
-// /api/items so persistence (Supabase on Vercel, memory locally) can be tested
-// end to end. The real designed flow is Phase 2; all logic stays in src/lib.
-// Protected by the PIN gate via middleware (/intake/*).
+// DEBUG page, not linked from the navigation. Photographs an item, runs
+// /api/vision/read-label and shows the raw read, then can Save to /api/items,
+// so the vision call and persistence can be checked on their own. Staff use
+// Add stock (/add). All logic stays in src/lib. Behind the staff PIN (the
+// proxy guards /intake/*).
 import { useState } from "react";
 import { prepareImage, type PreparedImage } from "@/lib/image";
 import type { LabelRead } from "@/lib/vision";
@@ -232,7 +232,7 @@ export default function VisionTestPage() {
               type="button"
               onClick={handleSave}
               disabled={saving || name.trim().length === 0}
-              className="rounded bg-gray-900 p-3 font-medium text-white disabled:opacity-50"
+              className="min-h-11 rounded bg-gray-900 p-3 font-medium text-white disabled:opacity-50"
             >
               {saving ? "Saving…" : saveLabel}
             </button>
@@ -257,7 +257,7 @@ export default function VisionTestPage() {
                     </p>
                   ) : null}
                   <p className="mt-1">
-                    <a className="text-green-700 underline" href="/inventory">
+                    <a className="inline-flex min-h-11 items-center text-green-700 underline" href="/inventory">
                       Open Inventory
                     </a>
                   </p>

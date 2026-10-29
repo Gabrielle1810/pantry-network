@@ -1,32 +1,37 @@
 # Product: Pantry Network
 
 ## What it is
-A free, open-source web app for university food pantries in Massachusetts. Staff add incoming items by photographing them on a phone. Later modules will add student take-out by QR code, a dashboard, expiry-risk alerts, and sharing surplus between nearby campuses.
+A free, open-source web app for university food pantries in Massachusetts. Staff run the pantry from a phone or a laptop: they add stock by photographing items, see what is on the shelves, record what goes out, and share surplus with nearby campuses. Students take items by scanning a QR poster, with no login and no names.
 
-## Current module: Intake
-Staff photograph each item as a delivery arrives. AI reads the label (name, size, category, expiry date). Staff confirm or edit the result, then save. The item becomes an inventory batch.
+## What is built
+- **Add stock.** On a phone, the camera reads the label (name, size, category, expiry date) and staff confirm or edit, then save. On a laptop, Add stock is a typed form. Every save becomes an inventory batch.
+- **Inventory.** Smart cards (running low, expiring soon, expired, items this period), tabs, search, an edit drawer, a Full sheet for spreadsheet-style editing, and a selection bar (Remove, Offer on Community).
+- **Take-out.** The student QR page, staff "Record items out" with a 10-second Undo, Fix and Delete on feed entries, "Count looks off", and repeat student submissions held for review.
+- **Community.** Offers that set stock aside, requests, claims, and "Mark picked up", which moves stock between campuses exactly once.
+- **Settings and Help.** Morning email preview (nothing is sent), the status rules, and Reset demo data.
+- Two live sample campuses (Harbor University and Cedar Hill College) with a campus switcher. Four more sample campuses appear only on Community.
 
 ## Users
-- Pantry staff and volunteers, on their own phone, standing at the pantry during a delivery. They are busy and in a hurry. Intake must be faster than typing into a spreadsheet.
-- Students never use the Intake module.
+- Pantry staff and volunteers: on their own phone during a delivery (busy, in a hurry; intake must beat typing into a spreadsheet), and on a laptop for inventory, take-out and Community.
+- Students use only the public QR take-out page.
 
 ## Product rules (always follow)
 1. **Beat the spreadsheet.** Required to save: a name and a quantity. Everything else is optional.
-2. **Dates are optional.** Never block a save because a date is missing. "Unknown" and "Don't track a date" are valid answers.
+2. **Dates are optional.** Never block a save because a date is missing. "No date" and "Doesn't expire" are valid answers.
 3. **A human confirms every AI read.** AI output is a suggestion shown in editable fields. Nothing is saved without the staff member pressing Save.
-4. **Never invent data.** If the label is unreadable, show it as unknown. Never fill a guessed date.
-5. **Privacy.** No student data anywhere in this module. Photos show products only. Strip photo metadata (location) before upload. Do not store photos in this phase.
-6. **Dignity.** Use plain, warm, stigma-free language. Never use words like "needy" or "handout".
-7. **Phone first.** Pages must work on a 390 px wide phone screen.
-8. **Accessible basics.** Labelled inputs, real buttons, usable with a screen reader. Full visual accessibility work comes with the redesign.
-9. **Sample data only.** Use invented campus names ("Campus A", "Campus B") and invented items. Never commit real pantry spreadsheets, store names or prices.
-10. **The UI is a placeholder.** The current screens exist only to exercise the pipeline and will be fully redesigned later. Keep them plain and functional. Design images are inspiration for what a screen must do, not a visual spec. Spend effort on the logic, API, data and tests instead.
+4. **Never invent data.** If the label is unreadable, show it as unknown. Never fill a guessed date. Ambiguous dates are never auto-resolved.
+5. **No names.** No student data anywhere. Take-out records store no person's name, staff or student. The student page uses only a random device cookie (never a name or IP). Photos show products only, have their metadata stripped, and are not stored.
+6. **Stock is never overwritten.** On-shelf is derived from intake batches plus an append-only ledger. Edits, recounts and fixes write an adjustment for the difference, visible in History. "Moved to Community" sets stock aside; it leaves the shelf only when the pickup is marked done.
+7. **Desktop is typed.** On a laptop, Add stock is a typed form only: no camera, no upload, no picture. Phones get the camera, with "Type it instead".
+8. **Dignity.** Use plain, warm, stigma-free language. Never use words like "needy" or "handout".
+9. **Phone first, laptop too.** Every page must work on a 390 px wide phone screen and on a laptop.
+10. **Follow the design reference.** `design-reference/` (the prototype) is the visual and behavioral spec, with the approved changes in `.kiro/specs/pantry-app` (the "Community" label, stock never overwritten, no names, held repeat submissions). It stays out of the build, lint and tests.
+11. **Accessible, no jumps.** Labelled inputs, real buttons, 44 px targets, visible focus, AA contrast, no color-only meaning. Modals, drawers, steppers and tabs update in place: no re-mount, no replayed animation, no scroll jump.
+12. **Sample data only.** Invented campus names, invented items and invented brands (Harbor Pantry, Valley Farms, Sunrise, and so on). Never real brands or trademarks, real pantry spreadsheets, store names or prices.
 
-## Draft interface copy (placeholder wording; may change in the redesign)
-- Camera hint: "Show the item's name and the date on its label."
-- Review title: "Check this item"   Badge: "You can edit anything"
-- Field labels: "Identified as", "Expiration date", "How many?"
-- Date read note: "Read from the label: {best by | use by | sell by}."
-- Date missing note: "Date not found. Type it in, or leave it as Unknown and we'll ask again."
-- Checkbox: "This item moves fast: don't track a date"
-- Buttons: "Retake", "Save item", "Done"
+## Interface copy
+Wording follows `design-reference/`, kept plain and warm. Examples in the app:
+- Camera hint: "Show the item's name and the date on the label"
+- After a save: "Saved to Inventory", with the before + added = after line
+- Inventory edits: "A new number is saved as an adjustment in History. Nothing is overwritten."
+- Take-out: "No names are ever recorded for students"

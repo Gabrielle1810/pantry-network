@@ -5,6 +5,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { ProductCorrection } from "@/lib/corrections";
 import type {
+  BatchDatePatch,
   BatchRec,
   CampusRec,
   CountCheckRec,
@@ -22,6 +23,7 @@ import type {
   OfferRec,
   OfferStatus,
   PickupRec,
+  ProductPatch,
   ProductRec,
   RequestRec,
   Store,
@@ -161,7 +163,38 @@ export class SupabaseStore implements Store {
     return product(data as ProductRow);
   }
 
+  async updateProduct(id: string, patch: ProductPatch) {
+    const row: Record<string, unknown> = {};
+    if (patch.productKey !== undefined) row.product_key = patch.productKey;
+    if (patch.name !== undefined) row.name = patch.name;
+    if (patch.brand !== undefined) row.brand = patch.brand;
+    if (patch.category !== undefined) row.category = patch.category;
+    if (patch.categoryGroup !== undefined) row.category_group = patch.categoryGroup;
+    if (patch.unit !== undefined) row.unit = patch.unit;
+    if (patch.noExpire !== undefined) row.no_expire = patch.noExpire;
+    if (patch.source !== undefined) row.source = patch.source;
+    if (Object.keys(row).length === 0) return "updated" as const;
+    const { error } = await this.db.from("products").update(row).eq("id", id);
+    if (error) {
+      if (error.code === UNIQUE_VIOLATION) return "conflict" as const; // (campus_id, product_key) taken
+      this.fail("update product", error);
+    }
+    return "updated" as const;
+  }
+
   // ---- batches
+  async updateBatchDates(campusId: string, ids: string[], date: BatchDatePatch) {
+    if (ids.length === 0) return;
+    const { error } = await this.db
+      .from("item_batches")
+      .update({
+        expires_on: date.expiresOn, date_type: date.dateType, date_precision: date.datePrecision, date_source: date.dateSource,
+      })
+      .eq("campus_id", campusId)
+      .in("id", ids);
+    if (error) this.fail("update batch dates", error);
+  }
+
   async listBatches(campusId: string) {
     const rows = await this.all<BatchRow>("batches", (f, t) =>
       this.db.from("item_batches").select("*").eq("campus_id", campusId).order("id").range(f, t),

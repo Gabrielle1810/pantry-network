@@ -106,7 +106,7 @@ describe("matchRequest", () => {
 describe("recommendations", () => {
   it("builds claim / offer / need cards and respects 'Not now'", () => {
     const rows = [
-      row({ name: "Cheerios", category: "Cereal", status: "out", onShelf: 0 }),
+      row({ name: "Oat cereal cups", category: "Cereal", status: "out", onShelf: 0 }),
       row({ name: "Tomato paste", category: "Sauces/Pastes/Spread", status: "soon", expiresOn: "2026-10-26", onShelf: 2 }),
     ];
     const offers = [offer({ id: "cereal", campusId: "northfield", name: "Cereal cups", category: "Cereal", qty: 24 })];

@@ -56,7 +56,7 @@ describe("tabCounts & filterRows", () => {
 
 describe("inventoryCards", () => {
   const rows = [
-    row({ name: "Cheerios", status: "out", onShelf: 0, lastRestock: 12 }),
+    row({ name: "Oat cereal cups", status: "out", onShelf: 0, lastRestock: 12 }),
     row({ name: "Tomato paste", status: "soon", onShelf: 2, lastRestock: 4, expiresOn: "2026-10-26" }),
     row({ name: "Sauce", status: "expired", expiresOn: "2026-08-30" }),
   ];
@@ -64,7 +64,7 @@ describe("inventoryCards", () => {
     const cards = inventoryCards(rows, TODAY);
     expect(cards).toHaveLength(4);
     expect(cards[0].label).toBe("Running low");
-    expect(cards[0].title).toContain("Cheerios");
+    expect(cards[0].title).toContain("Oat cereal cups");
     expect(cards[1].label).toBe("Expiring soon");
     expect(cards[1].title).toContain("Tomato paste");
     expect(cards[2].label).toBe("Expired");
@@ -73,8 +73,8 @@ describe("inventoryCards", () => {
     expect(cards[3].num).toBe(3);
     // PD.2: Running low offers Request items (Community, prefilled) and Add items (Add stock, prefilled).
     expect(cards[0].actions).toEqual([
-      { label: "Request items", href: "/community?request=Cheerios&category=Canned%20Goods", primary: true },
-      { label: "Add items", href: "/add?product=Cheerios" },
+      { label: "Request items", href: "/community?request=Oat%20cereal%20cups&category=Canned%20Goods", primary: true },
+      { label: "Add items", href: "/add?product=Oat%20cereal%20cups" },
     ]);
     // Expiring soon → Offer on Community (prefilled) + See all N (tab switch).
     expect(cards[1].actions).toEqual([

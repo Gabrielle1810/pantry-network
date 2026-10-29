@@ -1,5 +1,6 @@
-// Inventory page (PD). Server component: reads derived rows for the active
-// campus and hands them to the client view, which owns tabs/search in place.
+// Inventory page (PD). Server component: reads derived rows and recent history
+// for the active campus and hands them to the client view, which owns tabs,
+// search, the Full sheet, selection and the edit drawer in place.
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { cookies } from "next/headers";
@@ -23,6 +24,14 @@ async function InventoryData() {
   const active = activeCampusFrom(jar.get(ACTIVE_CAMPUS_COOKIE)?.value);
   const today = todayInTz();
   const repo = getAppRepository(today);
-  const rows = await repo.listInventory(active, today);
-  return <InventoryView rows={rows} today={today} campusName={campusName(active)} />;
+  const [rows, history] = await Promise.all([repo.listInventory(active, today), repo.listHistory(active)]);
+  return (
+    <InventoryView
+      rows={rows}
+      history={history}
+      today={today}
+      nowIso={new Date().toISOString()}
+      campusName={campusName(active)}
+    />
+  );
 }

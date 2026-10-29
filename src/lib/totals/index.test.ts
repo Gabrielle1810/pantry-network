@@ -32,11 +32,11 @@ function batch(name: string, brand: string | null, quantity: number): ItemBatch 
 describe("UI10 inventoryTotals", () => {
   it("before + added = after, grouped by normalized name+brand", () => {
     const existing = [
-      batch("Tomato paste", "Hunt's", 2),
-      batch("tomato  paste", "HUNT'S", 3), // same product, case/space variation
+      batch("Tomato paste", "Valley Farms", 2),
+      batch("tomato  paste", "VALLEY  FARMS", 3), // same product, case/space variation
       batch("Black beans", "Campus Brand", 6), // different product
     ];
-    const t = inventoryTotals(existing, "Tomato paste", "Hunt's", 4);
+    const t = inventoryTotals(existing, "Tomato paste", "Valley Farms", 4);
     expect(t).toEqual({ before: 5, added: 4, after: 9, firstBatch: false });
   });
 

@@ -33,17 +33,17 @@ describe("draftFromRead", () => {
   });
 
   it("UI9.2 applies a remembered fix to name/brand/category but never to dates", () => {
-    const fix = { name: "Black beans", brand: "Goya", category: "Canned Goods" };
+    const fix = { name: "Black beans", brand: "Harbor Pantry", category: "Canned Goods" };
     const { draft, rememberedFields } = draftFromRead(can, fix);
     expect(draft.name).toBe("Black beans");
-    expect(draft.brand).toBe("Goya");
+    expect(draft.brand).toBe("Harbor Pantry");
     expect(rememberedFields).toEqual(["name", "brand"]); // category already matched
     expect(draft.expiresOn).toBe(can.expires_on);
     expect(draft.datePrecision).toBe(can.date_precision);
   });
 
   it("UI9.4 a remembered fix alone is not an edit", () => {
-    const fix = { name: "Black beans", brand: "Goya", category: null };
+    const fix = { name: "Black beans", brand: "Harbor Pantry", category: null };
     const { draft } = draftFromRead(can, fix);
     expect(computeEditedFields(draft, draft, [])).toEqual([]);
     expect(computeEditedFields(draft, applyEdit(draft, { name: "Pinto beans" }), [])).toEqual(["name"]);
@@ -74,13 +74,13 @@ describe("ambiguous dates", () => {
 
 describe("applyDateOnlyRead (Photograph the date instead)", () => {
   it("fills only the date fields and keeps name, brand, category and quantity", () => {
-    const start = applyEdit(emptyDraft(), { name: "Tomato paste", brand: "Hunt's", category: "Sauces/Pastes/Spread", quantity: 4 });
+    const start = applyEdit(emptyDraft(), { name: "Tomato paste", brand: "Valley Farms", category: "Sauces/Pastes/Spread", quantity: 4 });
     const dateRead: LabelRead = { ...MOCK_FIXTURES.unreadable, name: "IGNORED", expires_on: "2026-11-02", date_type: "best_by", date_precision: "day" };
     const { draft, found } = applyDateOnlyRead(start, dateRead);
     expect(found).toBe(true);
     expect(draft.expiresOn).toBe("2026-11-02");
     expect(draft.name).toBe("Tomato paste");
-    expect(draft.brand).toBe("Hunt's");
+    expect(draft.brand).toBe("Valley Farms");
     expect(draft.category).toBe("Sauces/Pastes/Spread");
     expect(draft.quantity).toBe(4);
   });

@@ -43,11 +43,16 @@
      changes inside them never re-mount, so they never replay. Used through
      motion-safe: so reduced-motion users get no movement. */
   --animate-sheet-in: sheet-in 220ms ease-out;
+  --animate-drawer-in: drawer-in 220ms ease-out;
   --animate-fade-in: fade-in 160ms ease-out;
 
   @keyframes sheet-in {
     from { transform: translateY(100%); }
     to { transform: translateY(0); }
+  }
+  @keyframes drawer-in {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
   }
   @keyframes fade-in {
     from { opacity: 0; }

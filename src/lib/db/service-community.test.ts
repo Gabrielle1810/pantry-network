@@ -12,7 +12,7 @@ function setup() {
 
 const row = async (repo: AppService, campus: string, id: string) => (await repo.getProduct(campus, id, TODAY))!;
 const cornAt = async (repo: AppService, campus: string) =>
-  (await repo.listInventory(campus, TODAY)).find((r) => r.name === "Canned corn" && r.brand === "Del Monte")!;
+  (await repo.listInventory(campus, TODAY)).find((r) => r.name === "Canned corn" && r.brand === "Valley Farms")!;
 
 describe("PO.6a: offer → claim → pickup subtracts from the offering campus exactly once", () => {
   it("harbor offers, cedar claims and picks up", async () => {
@@ -33,7 +33,7 @@ describe("PO.6a: offer → claim → pickup subtracts from the offering campus e
     expect((await row(repo, "harbor", "harbor:pb")).reserved).toBe(10); // pickup released
     const pbAtCedar = (await repo.listInventory("cedar", TODAY)).find((r) => r.name === "Peanut butter (single serve)")!;
     expect(pbAtCedar.onShelf).toBe(30);
-    expect(pbAtCedar.brand).toBe("Jif"); // same product identity, brand carried over
+    expect(pbAtCedar.brand).toBe("Sunrise"); // same product identity, brand carried over
 
     // Marking it picked up again changes nothing on either side.
     const again = await repo.completePickup("cedar", claim!.pickupId, TODAY);

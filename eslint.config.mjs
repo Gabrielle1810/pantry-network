@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Reference prototype kept as documentation only (PA.3).
     "design-reference/**",
+    // Local scratch scripts (gitignored).
+    ".tmp/**",
   ]),
 ]);
 

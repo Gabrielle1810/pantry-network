@@ -390,7 +390,7 @@ Request: `{ "imageBase64": "<jpeg base64, no data: prefix>" }`  (≤ 2 MB decode
 - 200 ok:
 ```json
 { "status": "ok", "provider": "anthropic",
-  "read": { "name": "Black beans, canned, 15 oz", "brand": "Goya", "size_text": "15 oz",
+  "read": { "name": "Black beans, canned, 15 oz", "brand": "Harbor Pantry", "size_text": "15 oz",
     "category": "Canned Goods", "is_food": true, "doesnt_expire": false, "perishable": false,
     "date_raw": "BEST BY 06/2027", "date_type": "best_by", "expires_on": "2027-06-30",
     "date_precision": "month", "date_ambiguous": false, "date_candidates": [],
@@ -404,7 +404,7 @@ Request: `{ "imageBase64": "<jpeg base64, no data: prefix>" }`  (≤ 2 MB decode
 Request:
 ```json
 { "idempotencyKey": "uuid-from-client",
-  "batch": { "name": "Black beans, canned, 15 oz", "brand": "Goya", "size_text": "15 oz",
+  "batch": { "name": "Black beans, canned, 15 oz", "brand": "Harbor Pantry", "size_text": "15 oz",
     "category": "Canned Goods", "quantity": 12, "expires_on": "2027-06-30",
     "date_type": "best_by", "date_precision": "month", "date_source": "photo",
     "dont_track": false, "doesnt_expire": false, "perishable": false, "source": "donated" },

@@ -84,7 +84,7 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
 - **Tests:** card models + tab counts + search filter (pure).
 - **Reqs:** PD.1–PD.6.
 
-### Task 2.3 — Inventory edit drawer + Full sheet + remove flow 🔴 ⏸ drawer, Full-sheet editing and selection bar moved to Step 7 (remove flow is done via Take-out)
+### Task 2.3 — Inventory edit drawer + Full sheet + remove flow 🔴 ✅ (built in Step 7; selection bar reuses the Take-out remove flow and the Community offer modal)
 - Edit drawer + Full-sheet cell edits: editing on-shelf writes an "Edited by staff"
   adjustment entry, never an overwrite (fix B, PD.7a/PD.10). Selection bar; remove
   flow (reasons, FIFO reduce, ledger, 10s Undo). "Moved to Community" creates an open
@@ -186,20 +186,20 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
 
 ## Step 7 — Polish, tests, docs, deploy 🔴
 
-### Task 7.1 — Steering + docs 🔴
+### Task 7.1 — Steering + docs 🔴 ✅
 - `product.md` rule 10 replaced (follows design-reference + changes); add no-names
   (PH) + desktop typed-form (PF) rules. `structure.md`: new modules/routes/
   migrations. README/DEPLOY: routes, campus switcher, Supabase requirement,
   capability detection.
 - **Reqs:** PN.1–PN.3.
 
-### Task 7.2 — Accessibility + interaction pass 🔴
+### Task 7.2 — Accessibility + interaction pass 🔴 ✅ (`/intake/today` deleted; `/intake/test` kept as a PIN-only debug page, not in nav)
 - 44 px targets, visible focus, AA contrast, no color-only meaning; verify no modal/
   drawer/stepper remount or scroll jump across the app (PG.1/PG.3). Clean up the
   temporary `/intake/test` + `/intake/today` once real pages cover them.
 - **Reqs:** PG.1–PG.3, PL.3.
 
-### Task 7.3 — Full verification + deploy check 🔴
+### Task 7.3 — Full verification + deploy check 🔴 ✅
 - `npm run build` + `npm test` + `npm run lint` green; confirm deleting
   `src/app` + `src/components` leaves `src/lib` tests passing (PA.1); migration ready
   to run; commit, push, give you the phone + desktop + two-campus demo script.

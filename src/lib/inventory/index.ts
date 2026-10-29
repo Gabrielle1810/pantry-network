@@ -5,6 +5,9 @@ import type { InventoryRow } from "@/lib/db/app-types";
 import { daysUntil } from "@/lib/dates";
 import { COMMUNITY_LABEL, COMMUNITY_SLUG } from "@/lib/labels";
 
+export * from "./edit";
+export * from "./selection";
+
 // ---- tabs ----
 export type InventoryTabKey =
   | "all"

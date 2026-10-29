@@ -31,6 +31,7 @@ export interface ProductRec {
   source: DeliverySourceRec;
 }
 export type NewProduct = Omit<ProductRec, "id">;
+export type ProductPatch = Partial<Omit<ProductRec, "id" | "campusId" | "sizeText">>;
 
 export interface BatchRec {
   id: string;
@@ -46,6 +47,7 @@ export interface BatchRec {
   createdAt: string;
 }
 export type NewBatch = Omit<BatchRec, "id" | "createdAt"> & { createdAt?: string };
+export type BatchDatePatch = Pick<BatchRec, "expiresOn" | "dateType" | "datePrecision" | "dateSource">;
 
 /** Append-only. There is deliberately no person/name field (no-names rule). */
 export interface LedgerRec {
@@ -153,11 +155,15 @@ export interface Store {
   listProducts(campusId: string): Promise<ProductRec[]>;
   /** Insert, or return the existing product with the same (campusId, productKey). */
   upsertProduct(p: NewProduct): Promise<ProductRec>;
+  /** Change product details. "conflict" (nothing changed) if the new productKey is taken. */
+  updateProduct(id: string, patch: ProductPatch): Promise<"updated" | "conflict">;
 
   listBatches(campusId: string): Promise<BatchRec[]>;
   getBatchByKey(campusId: string, key: string): Promise<BatchRec | null>;
   /** A repeated idempotencyKey inserts nothing and returns the existing batch. */
   insertBatch(b: NewBatch): Promise<{ batch: BatchRec; duplicate: boolean }>;
+  /** Set the date on these batches (a date edit; quantities are never changed). */
+  updateBatchDates(campusId: string, ids: string[], date: BatchDatePatch): Promise<void>;
 
   listLedger(campusId: string): Promise<LedgerRec[]>;
   /** All-or-nothing; "duplicate" (nothing inserted) if any idempotencyKey already exists. */

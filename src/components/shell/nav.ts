@@ -16,7 +16,7 @@ export const NAV: NavItem[] = [
 ];
 
 export const FOOT: NavItem[] = [
-  { href: "/help", label: "Help", icon: "circle-help" },
+  { href: "/help", label: "Help", icon: "circle-question-mark" },
   { href: "/settings", label: "Settings", icon: "settings" },
 ];
 

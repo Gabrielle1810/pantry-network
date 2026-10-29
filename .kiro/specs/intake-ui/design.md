@@ -300,7 +300,7 @@ is applied in the Supabase setup task.
 Request:
 ```json
 { "idempotencyKey": "uuid",
-  "batch": { "name": "Tomato paste", "brand": "Hunt's", "size_text": null,
+  "batch": { "name": "Tomato paste", "brand": "Valley Farms", "size_text": null,
     "category": "Sauces/Pastes/Spread", "quantity": 4, "unit": "can",
     "expires_on": "2026-10-26", "date_type": "best_by", "date_precision": "day",
     "date_source": "photo", "dont_track": false, "doesnt_expire": false,
