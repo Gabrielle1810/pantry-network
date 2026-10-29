@@ -5,6 +5,7 @@
 import type { Status } from "@/lib/status";
 import type { ProductCorrection } from "@/lib/corrections";
 import type { FeedEntry, FeedLine, LineInput, ReasonCode } from "@/lib/takeout";
+import type { OfferRec, PickupRec, RequestRec } from "./store";
 
 /** A product with its derived stock + status, ready for the Inventory table. */
 export interface InventoryRow {
@@ -169,6 +170,46 @@ export interface AppRepository {
   // ---- Community offers that reserve stock ----
   createOffer(input: CreateOfferInput, todayIso: string): Promise<{ offerId: string; qty: number } | null>;
   withdrawOffer(campusId: string, offerId: string): Promise<boolean>;
+
+  // ---- Community (Step 5) ----
+  /** Everything the Community page needs for the active campus. */
+  listCommunity(campusId: string, todayIso: string): Promise<CommunitySnapshot>;
+  createRequest(input: CreateRequestInput): Promise<{ requestId: string } | null>;
+  /**
+   * Claim part or all of another campus's open offer → a pending pickup. The
+   * units stay reserved at the offering campus until the pickup is completed.
+   */
+  claimOffer(campusId: string, offerId: string, qty: number): Promise<{ pickupId: string; qty: number } | null>;
+  /**
+   * "Mark picked up" (by the claiming campus). Subtracts from the offering
+   * campus exactly once, releases the reservation, and adds an intake batch to
+   * the claiming campus. Repeating it changes nothing.
+   */
+  completePickup(campusId: string, pickupId: string, todayIso: string): Promise<CompletePickupResult | null>;
+}
+
+export interface CommunitySnapshot {
+  rows: InventoryRow[];
+  offers: OfferRec[];
+  requests: RequestRec[];
+  pickups: PickupRec[];
+}
+
+export interface CreateRequestInput {
+  campusId: string;
+  name: string;
+  category: string;
+  qty: number;
+}
+
+export interface CompletePickupResult {
+  /** Units that left the offering campus and arrived here. */
+  moved: number;
+  /** True if this pickup had already been completed (nothing changed). */
+  duplicate: boolean;
+  product: { id: string; name: string; unit: string; category: string };
+  before: number;
+  after: number;
 }
 
 export interface CreateOfferInput {

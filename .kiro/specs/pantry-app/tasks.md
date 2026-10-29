@@ -156,7 +156,7 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
 
 ## Step 5 — Community 🔴
 
-### Task 5.1 — Community logic + API 🔴
+### Task 5.1 — Community logic + API 🔴 ✅
 - `src/lib/community` (recommendations/matchChip ranking; offer with reservation;
   withdraw releases reservation; claim → pickup; `completePickup` two-sided move that
   subtracts from A **exactly once** + releases the reservation + adds a batch to B).
@@ -166,7 +166,7 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
   campuses, never negative; recommendation ranking.
 - **Reqs:** PJ.1–PJ.7, PD.9a, PO.6a.
 
-### Task 5.2 — Community page UI 🔴
+### Task 5.2 — Community page UI 🔴 ✅
 - Recommendation cards, tabs (Available/Your offers/Requests), filters, offer/claim/
   request modals (in-place), pending pickups + Mark picked up. Uses `COMMUNITY_LABEL`.
 - **Tests:** none (UI).

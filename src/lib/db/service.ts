@@ -5,7 +5,7 @@
 // leaves a campus for Community only when a pickup is marked picked up.
 import { randomUUID } from "node:crypto";
 import { correctionKey, type ProductCorrection } from "@/lib/corrections";
-import { categoryGroup } from "@/lib/items/taxonomy";
+import { categoryGroup, normalizeCategory } from "@/lib/items/taxonomy";
 import {
   activeSoonestExpiry,
   deriveOnShelf,
@@ -28,8 +28,11 @@ import {
 import type {
   AppRepository,
   CampusInfo,
+  CommunitySnapshot,
+  CompletePickupResult,
   CountCheckView,
   CreateOfferInput,
+  CreateRequestInput,
   IntakeInput,
   IntakeResult,
   InventoryRow,
@@ -575,5 +578,133 @@ export class AppService implements AppRepository {
     return true;
   }
 
-  // __COMMUNITY__
+  // --------------------------------------------------------------- community
+  async listCommunity(campusId: string, todayIso: string): Promise<CommunitySnapshot> {
+    const snap = await this.snapshot(campusId);
+    const requests = await this.store.listRequests();
+    return {
+      rows: this.rowsFrom(campusId, todayIso, snap).sort((a, b) => a.name.localeCompare(b.name)),
+      offers: snap.offers,
+      requests,
+      pickups: snap.pickups,
+    };
+  }
+
+  async createRequest(input: CreateRequestInput) {
+    const name = input.name.trim().slice(0, 80);
+    const qty = Math.round(input.qty);
+    if (!name || !Number.isFinite(qty) || qty < 1 || qty > 999) return null;
+    const r = await this.store.insertRequest({
+      campusId: input.campusId,
+      name,
+      category: normalizeCategory(input.category),
+      qty,
+      offered: null,
+    });
+    return { requestId: r.id };
+  }
+
+  async claimOffer(campusId: string, offerId: string, qty: number) {
+    const offer = (await this.store.listOffers()).find((o) => o.id === offerId);
+    if (!offer || offer.status !== "open" || offer.campusId === campusId || offer.qty < 1) return null;
+    const n = Math.min(Math.max(1, Math.round(qty)), offer.qty, 999);
+    if (!Number.isFinite(n) || n < 1) return null;
+    const remaining = offer.qty - n;
+    // Guarded update: if someone else claimed in the meantime, nothing changes.
+    const ok = await this.store.updateOfferQtyIf(offer.id, offer.qty, remaining, remaining === 0 ? "claimed" : "open");
+    if (!ok) return null;
+    const pickup = await this.store.insertPickup({
+      offerId: offer.id,
+      productId: offer.productId,
+      fromCampus: offer.campusId,
+      toCampus: campusId,
+      name: offer.name,
+      unit: offer.unit,
+      qty: n,
+      category: offer.category,
+      expiresOn: offer.expiresOn,
+      noExpire: offer.noExpire,
+      status: "pending",
+    });
+    return { pickupId: pickup.id, qty: n };
+  }
+
+  async completePickup(campusId: string, pickupId: string, todayIso: string): Promise<CompletePickupResult | null> {
+    const pickup = (await this.store.listPickups()).find((p) => p.id === pickupId && p.toCampus === campusId);
+    if (!pickup) return null;
+
+    // The offering campus's product (null for sample campuses with no inventory).
+    const source = pickup.productId
+      ? (await this.store.listProducts(pickup.fromCampus)).find((p) => p.id === pickup.productId) ?? null
+      : null;
+
+    // 1) Leave the offering campus exactly once (idempotent by key).
+    const outKey = `pickup:${pickup.id}:out`;
+    let moved = pickup.qty;
+    if (source) {
+      const existing = (await this.store.listLedger(pickup.fromCampus)).find((l) => l.idempotencyKey === outKey);
+      if (existing) {
+        moved = -existing.delta;
+      } else {
+        // Never move more than is physically there (keeps the two sides equal).
+        moved = Math.min(pickup.qty, (await this.stockFor(pickup.fromCampus, source.id)).onShelf);
+        if (moved > 0) {
+          await this.store.insertLedger([
+            {
+              campusId: pickup.fromCampus,
+              productId: source.id,
+              delta: -moved,
+              kind: "community_out",
+              source: "staff",
+              reason: "community_pickup",
+              groupId: null,
+              idempotencyKey: outKey,
+            },
+          ]);
+        }
+      }
+    }
+
+    // 2) Arrive at the claiming campus as an intake batch (idempotent by key).
+    const product = await this.store.upsertProduct({
+      campusId,
+      productKey: correctionKey(source?.name ?? pickup.name, source?.brand ?? null),
+      name: source?.name ?? pickup.name,
+      brand: source?.brand ?? null,
+      sizeText: source?.sizeText ?? null,
+      category: source?.category ?? pickup.category,
+      categoryGroup: source?.categoryGroup ?? categoryGroup(pickup.category),
+      unit: source?.unit ?? pickup.unit,
+      noExpire: source?.noExpire ?? pickup.noExpire,
+      source: "donated",
+    });
+    const before = await this.stockFor(campusId, product.id);
+    let duplicate = pickup.status === "completed";
+    if (moved > 0) {
+      const { duplicate: dup } = await this.store.insertBatch({
+        campusId,
+        productId: product.id,
+        quantity: moved,
+        receivedOn: todayIso,
+        expiresOn: pickup.noExpire ? null : pickup.expiresOn,
+        dateType: pickup.expiresOn ? "best_by" : null,
+        datePrecision: pickup.expiresOn ? "day" : null,
+        dateSource: "imported",
+        idempotencyKey: `pickup:${pickup.id}:in`,
+      });
+      duplicate = duplicate || dup;
+    }
+
+    // 3) Release the reservation.
+    if (pickup.status !== "completed") await this.store.markPickupCompleted(pickup.id);
+
+    const after = await this.stockFor(campusId, product.id);
+    return {
+      moved,
+      duplicate,
+      product: { id: product.id, name: product.name, unit: product.unit, category: product.category },
+      before: duplicate ? Math.max(0, after.onShelf - moved) : before.onShelf,
+      after: after.onShelf,
+    };
+  }
 }
