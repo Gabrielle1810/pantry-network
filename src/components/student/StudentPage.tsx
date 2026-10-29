@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Thumb } from "@/components/ui/primitives";
 import { newKey } from "@/components/add/api";
 import { pluralizeUnit } from "@/lib/items/units";
+import type { StudentPageItem } from "@/lib/student/page-data";
 import {
   STUDENT_GROUPS,
   cartLines,
@@ -18,15 +19,7 @@ import {
   type Cart,
 } from "@/lib/student";
 
-export interface StudentItem {
-  productId: string;
-  name: string;
-  unit: string;
-  category: string;
-  /** On the shelf minus anything set aside for Community. */
-  available: number;
-  useSoon: boolean;
-}
+export type StudentItem = StudentPageItem;
 
 interface Thanks {
   held: boolean;

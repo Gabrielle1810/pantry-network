@@ -13,13 +13,14 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { getAppRepository } from "@/lib/db";
 import { todayInTz } from "@/lib/dates";
+import { isWellFormedToken } from "@/lib/student/page-data";
 
 const DEVICE_COOKIE = "pn_device";
 const DEVICE_COOKIE_SECONDS = 24 * 60 * 60;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const bodySchema = z.object({
-  token: z.string().min(8).max(200),
+  token: z.string().max(200),
   submissionId: z.string().min(8).max(100),
   lines: z.array(z.object({ productId: z.string().min(1).max(100), qty: z.number().int().min(1).max(999) })).min(1).max(60),
 });
@@ -36,6 +37,9 @@ export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: "bad_request" }, { status: 400, headers: noStore });
   const { token, submissionId, lines } = parsed.data;
+
+  // A plain campus id (or anything not token-shaped) is never a valid link.
+  if (!isWellFormedToken(token)) return NextResponse.json({ error: "not_found" }, { status: 404, headers: noStore });
 
   const today = todayInTz();
   const repo = getAppRepository(today);

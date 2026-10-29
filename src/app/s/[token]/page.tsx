@@ -2,43 +2,32 @@
 // campus's random student token (the QR poster URL), never the campus id or the
 // manager's campus cookie. Shows only what a student may take: in stock, not
 // expired, and not set aside for Community.
+//
+// The real HTTP 404 for a wrong token (or a plain campus id) comes from
+// src/proxy.ts, which runs before rendering: once a page streams, its status is
+// fixed at 200 (Next.js docs, "The HTTP contract"). This page re-checks the
+// token as a backstop and renders not-found without any inventory.
+// `instant = false` lets this route block on that check.
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { getAppRepository } from "@/lib/db";
 import { todayInTz } from "@/lib/dates";
-import { studentAvailable } from "@/lib/student";
-import { StudentPage, type StudentItem } from "@/components/student/StudentPage";
+import { loadStudentPage } from "@/lib/student/page-data";
+import { StudentPage } from "@/components/student/StudentPage";
+
+export const instant = false;
 
 export const metadata: Metadata = {
   title: "Took something? · Pantry Network",
   robots: { index: false, follow: false },
 };
 
-export default function StudentRoute(props: PageProps<"/s/[token]">) {
-  return (
-    <Suspense fallback={<p className="p-6 text-center text-muted">Loading…</p>}>
-      <StudentData params={props.params} />
-    </Suspense>
-  );
-}
-
-async function StudentData({ params }: { params: PageProps<"/s/[token]">["params"] }) {
+export default async function StudentRoute(props: PageProps<"/s/[token]">) {
+  const { token } = await props.params;
   await connection();
-  const { token } = await params;
   const today = todayInTz();
-  const repo = getAppRepository(today);
-  const campus = await repo.getCampusByToken(token);
-  if (!campus) notFound();
-  const rows = await repo.listStudentInventory(campus.id, today);
-  const items: StudentItem[] = rows.map((r) => ({
-    productId: r.productId,
-    name: r.name,
-    unit: r.unit,
-    category: r.category,
-    available: studentAvailable(r),
-    useSoon: r.status === "soon",
-  }));
-  return <StudentPage token={token} campusName={campus.name} items={items} />;
+  const data = await loadStudentPage(getAppRepository(today), token, today);
+  if (!data) notFound();
+  return <StudentPage token={token} campusName={data.campusName} items={data.items} />;
 }

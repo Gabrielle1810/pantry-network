@@ -35,5 +35,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# local scratch scripts and cookie jars (never written outside the repo)
+/.tmp/
+
 # NOTE: never ignore .kiro — the specs, steering, and hooks must be committed
 # to the public repo (hackathon requirement). A hook warns if .kiro is ignored.

@@ -84,7 +84,7 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
 - **Tests:** card models + tab counts + search filter (pure).
 - **Reqs:** PD.1–PD.6.
 
-### Task 2.3 — Inventory edit drawer + Full sheet + remove flow 🔴 ⏸ not built yet; moved to Step 4 (shares the ledger/remove code with Take-out)
+### Task 2.3 — Inventory edit drawer + Full sheet + remove flow 🔴 ⏸ drawer, Full-sheet editing and selection bar moved to Step 7 (remove flow is done via Take-out)
 - Edit drawer + Full-sheet cell edits: editing on-shelf writes an "Edited by staff"
   adjustment entry, never an overwrite (fix B, PD.7a/PD.10). Selection bar; remove
   flow (reasons, FIFO reduce, ledger, 10s Undo). "Moved to Community" creates an open
@@ -124,7 +124,7 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
 
 ## Step 4 — Take-out + Student page + QR poster 🔴
 
-### Task 4.1 — Take-out logic + API (no names) 🔴
+### Task 4.1 — Take-out logic + API (no names) 🔴 ✅
 - `src/lib/takeout` (record-out, fix/delete math, feed grouping, FIFO), `POST
   /api/takeout(/fix|/delete|/recount)`, `GET /api/takeout?since=today`. **No name
   field anywhere; no name stored** (PH.2/PH.3/PO.5).
@@ -132,14 +132,14 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
   adjustment; idempotency.
 - **Reqs:** PH.1–PH.6.
 
-### Task 4.2 — Take-out page UI 🔴
+### Task 4.2 — Take-out page UI 🔴 ✅
 - Smart cards (Out today / Most taken / Count looks off), feed with
   All/Students/Staff, Record-items-out modal (**no name field**, in-place, no jump —
   PG.2), Fix modal.
 - **Tests:** none (UI).
 - **Reqs:** PH.1–PH.6, PG.2.
 
-### Task 4.3 — Student page + QR poster (token + held-for-review) 🔴
+### Task 4.3 — Student page + QR poster (token + held-for-review) 🔴 ✅ (wrong token → real 404 via src/proxy.ts)
 - Public `/s/[token]` (unguessable token → campus, PI.1): in-stock minus reserved,
   non-expired only (PI.2), group chips + search, cart capped at on-shelf − reserved,
   Done → student take-out (FIFO, no name/personal data, idempotent per submission).
