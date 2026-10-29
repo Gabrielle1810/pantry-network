@@ -176,7 +176,7 @@ UI stays thin and deletable (PA.1). Mock vision only; no test hits the network
 
 ## Step 6 — Settings + Help 🔴
 
-### Task 6.1 — Settings (email preview, rules, reset) + Help 🔴
+### Task 6.1 — Settings (email preview, rules, reset) + Help 🔴 ✅
 - `/settings`: morning-email preview from status rules, status-rules legend, Reset
   demo data (re-seed active campus). `/help`: ordered how-it-works steps.
 - **Tests:** email-preview model (which items are urgent) is pure + tested.
